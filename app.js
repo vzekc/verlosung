@@ -1,5 +1,8 @@
 import { Lottery } from './lottery.js'
 
+// Global counter for pakets
+let paketCounter = 1
+
 function shortenSeed(seed) {
   if (seed.length <= 16) return seed
   return `${seed.substring(0, 8)}...${seed.substring(seed.length - 8)}`
@@ -393,10 +396,10 @@ function createParticipantInput() {
 function createPaket() {
   const paket = document.createElement('div')
   paket.className = 'paket'
-  paket.dataset.paketId = 1 // This will be updated by renumberPakets
+  paket.dataset.paketId = paketCounter
   paket.innerHTML = `
         <div class="paket-header">
-            <h3>Paket #1</h3>
+            <h3>Paket #${paketCounter}</h3>
             <input type="text" class="paket-title" placeholder="Titel des Pakets" required>
             <button type="button" class="remove-paket">×</button>
         </div>
@@ -405,6 +408,7 @@ function createPaket() {
             <button type="button" class="add-participant">+ Neuer Teilnehmer</button>
         </div>
     `
+  paketCounter++
   return paket
 }
 
@@ -414,7 +418,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const paketsContainer = document.getElementById('pakets-container')
   const addPaketButton = document.getElementById('addPaket')
   const drawButton = document.getElementById('drawButton')
-  let paketCounter = 1
 
   // Add drag and drop handlers for JSON files
   document.addEventListener('dragover', (e) => {
