@@ -7,6 +7,7 @@ export class Lottery {
     this.drawings = []
     this.rnd = null // Initialize RNG to null
     this.initialized = false
+    this.input = input // Store the input data
 
     // Convert packets to internal format
     for (const packet of input.packets) {
@@ -18,7 +19,6 @@ export class Lottery {
       this.drawings.push({
         text: packet.title,
         names: names,
-        original_packet: packet,
       })
     }
 
@@ -68,7 +68,7 @@ export class Lottery {
     return this
   }
 
-  _drawWinner(text, names, original_packet) {
+  _drawWinner(text, names) {
     if (!this.initialized || !this.rnd) {
       throw new Error('Random number generator not initialized')
     }
@@ -89,7 +89,6 @@ export class Lottery {
       text,
       participants: Object.entries(counts).map(([name, tickets]) => ({ name, tickets })),
       winner,
-      original_packet,
     }
   }
 
@@ -102,7 +101,7 @@ export class Lottery {
     const drawings = []
 
     for (const drawing of this.drawings) {
-      drawings.push(this._drawWinner(drawing.text, drawing.names, drawing.original_packet))
+      drawings.push(this._drawWinner(drawing.text, drawing.names))
     }
 
     return {
@@ -110,6 +109,7 @@ export class Lottery {
       timestamp: this.timestamp,
       drawingTimestamp,
       rngSeed: this.seed,
+      packets: this.input.packets, // Use stored input data
       drawings,
     }
   }

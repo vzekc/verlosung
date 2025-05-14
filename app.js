@@ -288,7 +288,13 @@ function populateFormWithData(data) {
   // Set timestamp
   if (data.timestamp) {
     const date = new Date(data.timestamp)
-    document.getElementById('timestamp').value = date.toISOString().slice(0, 16)
+    // Convert to local timezone for datetime-local input
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const hours = String(date.getHours()).padStart(2, '0')
+    const minutes = String(date.getMinutes()).padStart(2, '0')
+    document.getElementById('timestamp').value = `${year}-${month}-${day}T${hours}:${minutes}`
   }
 
   // Clear existing pakets
@@ -409,6 +415,134 @@ document.addEventListener('DOMContentLoaded', () => {
   const addPaketButton = document.getElementById('addPaket')
   const drawButton = document.getElementById('drawButton')
   let paketCounter = 1
+
+  // Add drag and drop handlers for JSON files
+  document.addEventListener('dragover', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    document.body.classList.add('drag-over')
+  })
+
+  document.addEventListener('dragleave', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.target === document.body) {
+      document.body.classList.remove('drag-over')
+    }
+  })
+
+  document.addEventListener('drop', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    document.body.classList.remove('drag-over')
+
+    const file = e.dataTransfer.files[0]
+    if (!file || !file.name.endsWith('.json')) {
+      alert('Bitte nur JSON-Dateien ablegen.')
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      try {
+        const data = JSON.parse(event.target.result)
+        console.log('Loaded JSON data:', data)
+
+        // More detailed validation
+        const validationErrors = []
+        if (!data.title) {
+          validationErrors.push('Titel fehlt')
+        }
+
+        // First validate the base lottery data structure
+        if (!Array.isArray(data.packets)) {
+          validationErrors.push('Keine Pakete gefunden')
+        } else {
+          // Validate packets structure
+          data.packets.forEach((packet, index) => {
+            if (!packet.title) {
+              validationErrors.push(`Paket #${index + 1}: Titel fehlt`)
+            }
+            if (!Array.isArray(packet.participants)) {
+              validationErrors.push(`Paket #${index + 1}: Keine Teilnehmer gefunden`)
+            } else {
+              packet.participants.forEach((participant, pIndex) => {
+                if (!participant.name) {
+                  validationErrors.push(`Paket #${index + 1}, Teilnehmer #${pIndex + 1}: Name fehlt`)
+                }
+              })
+            }
+          })
+        }
+
+        // If this is a results file, validate the additional results data
+        if (data.drawings) {
+          if (!Array.isArray(data.drawings)) {
+            validationErrors.push('Ziehungen müssen ein Array sein')
+          } else {
+            // Validate each drawing
+            data.drawings.forEach((drawing, index) => {
+              if (!drawing.text) {
+                validationErrors.push(`Ziehung #${index + 1}: Text fehlt`)
+              }
+              if (!Array.isArray(drawing.participants)) {
+                validationErrors.push(`Ziehung #${index + 1}: Keine Teilnehmer gefunden`)
+              } else {
+                drawing.participants.forEach((participant, pIndex) => {
+                  if (!participant.name) {
+                    validationErrors.push(`Ziehung #${index + 1}, Teilnehmer #${pIndex + 1}: Name fehlt`)
+                  }
+                })
+              }
+              if (!drawing.winner) {
+                validationErrors.push(`Ziehung #${index + 1}: Kein Gewinner gefunden`)
+              }
+            })
+          }
+
+          if (validationErrors.length > 0) {
+            throw new Error(`Ungültiges Ergebnisformat:\n${validationErrors.join('\n')}`)
+          }
+
+          // For results files, first populate the form with the original lottery data
+          const lotteryData = {
+            title: data.title,
+            timestamp: data.timestamp,
+            packets: data.packets
+          }
+          populateFormWithData(lotteryData)
+          localStorage.setItem('lotteryData', JSON.stringify(lotteryData))
+          renumberPakets()
+          updateRemoveButtons()
+          updateDrawButton()
+
+          // Then display the results
+          displayResults(data)
+        } else {
+          // For lottery data files, validate and load into form
+          if (validationErrors.length > 0) {
+            throw new Error(`Ungültiges Dateiformat:\n${validationErrors.join('\n')}`)
+          }
+          populateFormWithData(data)
+          localStorage.setItem('lotteryData', JSON.stringify(data))
+          renumberPakets()
+          updateRemoveButtons()
+          updateDrawButton()
+        }
+      } catch (error) {
+        console.error('Error loading JSON:', error)
+        if (error instanceof SyntaxError) {
+          alert('Die Datei enthält kein gültiges JSON-Format')
+        } else {
+          alert(error.message)
+        }
+      }
+    }
+    reader.onerror = () => {
+      alert('Fehler beim Lesen der Datei')
+    }
+    reader.readAsText(file)
+  })
 
   // Format date to German format
   function formatDate(date) {
