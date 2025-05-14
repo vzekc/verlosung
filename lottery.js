@@ -21,8 +21,6 @@ export class Lottery {
         names: names,
       })
     }
-
-    this.drawings.sort((a, b) => a.text.localeCompare(b.text))
   }
 
   async initialize() {

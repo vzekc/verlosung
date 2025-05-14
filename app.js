@@ -35,17 +35,15 @@ function getResultsHTML(results) {
             <div class="results-list">
                 ${results.drawings
                   .map(
-                    (drawing) => `
-                    <div class="result-item">
-                        <h3>${drawing.text}</h3>
-                        <p class="participants-line">
-                            <strong>Teilnehmer:</strong> 
-                            ${drawing.participants.map((p) => `@${p.name}`).join(', ')}
-                        </p>
-                        <div class="winner-announcement">
-                            Gewinner: <strong>@${drawing.winner} ${getRandomWinEmoji()}</strong>
-                        </div>
-                    </div>
+                    (drawing, index) => `
+                    <section class="result-item">
+                        <h3>Paket #${index + 1}: ${drawing.text}</h3>
+                        <div class="participants-label"><strong>Teilnehmer:</strong></div>
+                        <ul class="participants-list">
+                            ${drawing.participants.map((p) => `<li class="participant">@${p.name}</li>`).join('')}
+                        </ul>
+                        <div class="winner-announcement"><strong>Gewinner:</strong> @${drawing.winner} ${getRandomWinEmoji()}</div>
+                    </section>
                 `,
                   )
                   .join('')}
