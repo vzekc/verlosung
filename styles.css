@@ -368,4 +368,35 @@ input[type="number"]:focus {
 .copyable-seed.copied {
     background: #d4edda;
     color: #155724;
-} 
+}
+
+.header-container {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.header-container h1 {
+    margin: 0;
+    flex: 1;
+}
+
+.clear-lottery {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border: none;
+    border-radius: 50%;
+    background-color: #ff4444;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.clear-lottery:hover {
+    background-color: #cc0000;
+}

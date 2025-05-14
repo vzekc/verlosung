@@ -2,5 +2,8 @@
   "name": "verlosung",
   "version": "1.0.0",
   "type": "module",
-  "description": "Lottery system with Python-compatible PRNG"
-} 
+  "description": "Lottery system with Python-compatible PRNG",
+  "devDependencies": {
+    "prettier": "^3.5.3"
+  }
+}
