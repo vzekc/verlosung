@@ -11,27 +11,42 @@
         <form id="lotteryForm">
             <div class="form-group">
                 <label for="lotteryNumber">Nummer der Spende:</label>
-                <input type="number" id="lotteryNumber" min="100" max="9999" required placeholder="z.B. 1234">
+                <div class="input-wrapper">
+                    <input type="number" id="lotteryNumber" min="100" max="9999" required placeholder="z.B. 1234" pattern="[0-9]*" inputmode="numeric">
+                    <div class="validation-message" id="lotteryNumberError"></div>
+                </div>
             </div>
             <div class="form-group">
                 <label for="lotteryName">Name der Spende:</label>
-                <input type="text" id="lotteryName" required placeholder="z.B. Verschiedene Workstations">
+                <div class="input-wrapper">
+                    <input type="text" id="lotteryName" required placeholder="z.B. Verschiedene Workstations" minlength="3" maxlength="100">
+                    <div class="validation-message" id="lotteryNameError"></div>
+                </div>
             </div>
             <div class="form-group">
                 <label for="timestamp">Datum und Uhrzeit der Verlosungsankündigung im Forum:</label>
-                <input type="datetime-local" id="timestamp" required>
+                <div class="input-wrapper">
+                    <input type="datetime-local" id="timestamp" required min="2020-01-01T00:00">
+                    <div class="validation-message" id="timestampError"></div>
+                </div>
             </div>
 
             <div id="pakets-container">
                 <div class="paket" data-paket-id="1">
                     <div class="paket-header">
                         <h3>Paket #1</h3>
-                        <input type="text" class="paket-title" placeholder="Titel des Pakets" required>
+                        <div class="input-wrapper">
+                            <input type="text" class="paketTitle" placeholder="Titel des Pakets" required minlength="3" maxlength="100">
+                            <div class="validation-message paketTitle-error"></div>
+                        </div>
                         <button type="button" class="remove-paket" style="display: none;">×</button>
                     </div>
                     <div class="participants-container">
                         <div class="participant-input">
-                            <input type="text" placeholder="Teilnehmer Nickname" class="participant-name">
+                            <div class="input-wrapper">
+                                <input type="text" placeholder="Teilnehmer Nickname" class="participantName" minlength="2" maxlength="50" pattern="[a-zA-Z0-9_-]+">
+                                <div class="validation-message participantName-error"></div>
+                            </div>
                             <button type="button" class="remove-participant">×</button>
                         </div>
                         <button type="button" class="add-participant">+ Neuer Teilnehmer</button>
