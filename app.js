@@ -1,109 +1,396 @@
 import { Lottery } from './lottery.js';
 
-// Example lottery data
-const exampleData = {
-    "title": "Classic Computing Tombola 2024",
-    "timestamp": "2025-01-25T11:52:00+00:00",
-    "packets": [
-        {
-            "title": "Paket #1 SS2",
-            "participants": [
-                {"name": "@obsd_guru", "tickets": 1},
-                {"name": "@tuti", "tickets": 1},
-                {"name": "@Cobalt60", "tickets": 1},
-                {"name": "@gnupublic", "tickets": 1}
-            ]
-        },
-        {
-            "title": "Paket #2 SS10",
-            "participants": [
-                {"name": "@obsd_guru", "tickets": 1},
-                {"name": "@tuti", "tickets": 1},
-                {"name": "@Cobalt60", "tickets": 1},
-                {"name": "@gnupublic", "tickets": 1}
-            ]
-        },
-        {
-            "title": "Paket #3 V4K+Disks",
-            "participants": [
-                {"name": "@Hans", "tickets": 1},
-                {"name": "@Schroeder", "tickets": 1},
-                {"name": "@obsd_guru", "tickets": 1},
-                {"name": "@gnupublic", "tickets": 1}
-            ]
-        },
-        {
-            "title": "Paket #4 V4K",
-            "participants": [
-                {"name": "@Hans", "tickets": 1},
-                {"name": "@Schroeder", "tickets": 1},
-                {"name": "@obsd_guru", "tickets": 1},
-                {"name": "@gnupublic", "tickets": 1}
-            ]
-        },
-        {
-            "title": "Paket #5 NetApp",
-            "participants": [
-                {"name": "@Schroeder", "tickets": 1},
-                {"name": "@obsd_guru", "tickets": 1}
-            ]
-        }
-    ]
-};
-
-function formatDrawing(drawing) {
-    const participants = drawing.participants
-        .map(p => `${p.name} (${p.tickets})`)
-        .join(', ');
-    return `${drawing.text}: ${participants} → ${drawing.winner}`;
+function shortenSeed(seed) {
+    if (seed.length <= 16) return seed;
+    return `${seed.substring(0, 8)}...${seed.substring(seed.length - 8)}`;
 }
 
-function formatResults(results) {
+function getRandomWinEmoji() {
+    const emojis = ['🚀', '🎉', '🏆', '🥳', '🎂', '🍾', '🎊', '⭐', '💎', '👏'];
+    return emojis[Math.floor(Math.random() * emojis.length)];
+}
+
+function getResultsHTML(results) {
     const dt = new Date(results.timestamp);
     const epochTime = Math.floor(dt.getTime() / 1000);
+    const shortSeed = shortenSeed(results.rngSeed);
     
-    let output = `${results.title}\n`;
-    output += `Zeitpunkt: ${results.timestamp} (${epochTime})\n`;
-    output += `Seed: ${results.rngSeed}\n\n`;
-    
-    for (const drawing of results.drawings) {
-        output += formatDrawing(drawing) + '\n';
-    }
-    
-    return output;
+    return `
+        <div class="results-content">
+            <div class="results-header">
+                <h2>${results.title}</h2>
+                <div class="results-meta">
+                    <p><strong>Zeitpunkt:</strong> ${results.timestamp} (${epochTime})</p>
+                    <p>
+                        <strong>Seed:</strong> 
+                        <code class="copyable-seed" title="Klicken zum Kopieren des vollständigen Seeds" data-seed="${results.rngSeed}">
+                            ${shortSeed}
+                        </code>
+                    </p>
+                </div>
+            </div>
+            <div class="results-list">
+                ${results.drawings.map(drawing => `
+                    <div class="result-item">
+                        <h3>${drawing.text}</h3>
+                        <p class="participants-line">
+                            <strong>Teilnehmer:</strong> 
+                            ${drawing.participants.map(p => `@${p.name}`).join(', ')}
+                        </p>
+                        <div class="winner-announcement">
+                            Gewinner: <strong>@${drawing.winner} ${getRandomWinEmoji()}</strong>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
 }
 
-async function runLottery() {
-    try {
-        const jsonInput = document.getElementById('jsonInput').value;
-        const data = JSON.parse(jsonInput);
-        
-        const lottery = new Lottery(data);
-        await lottery.initialize();
-        const results = await lottery.draw();
-        
-        // Display formatted results
-        document.getElementById('results').textContent = formatResults(results);
-        
-        // Save results to JSON
+function createFilename(title) {
+    // Convert to lowercase and replace spaces with hyphens
+    let filename = title.toLowerCase()
+        // Replace spaces and special characters with hyphens
+        .replace(/[^a-z0-9]+/g, '-')
+        // Remove leading/trailing hyphens
+        .replace(/^-+|-+$/g, '')
+        // Limit length to 50 characters (accounting for the prefix)
+        .substring(0, 42);
+    
+    // Add timestamp to ensure uniqueness
+    const timestamp = new Date().toISOString().split('T')[0];
+    return `verlosung-${filename}-${timestamp}`;
+}
+
+function displayResults(results) {
+    const filename = createFilename(results.title);
+    const resultsHTML = getResultsHTML(results);
+    
+    const resultsContainer = document.getElementById('results');
+    resultsContainer.innerHTML = `
+        ${resultsHTML}
+        <div class="results-actions">
+            <button type="button" id="copyResults" class="action-button">Ergebnisse kopieren</button>
+            <button type="button" id="downloadResults" class="action-button">JSON herunterladen</button>
+        </div>
+    `;
+
+    // Add event listener for seed copy
+    const seedElement = resultsContainer.querySelector('.copyable-seed');
+    if (seedElement) {
+        seedElement.addEventListener('click', () => {
+            const fullSeed = seedElement.dataset.seed;
+            navigator.clipboard.writeText(fullSeed).then(() => {
+                const originalText = seedElement.textContent;
+                seedElement.textContent = 'Kopiert!';
+                seedElement.classList.add('copied');
+                setTimeout(() => {
+                    seedElement.textContent = originalText;
+                    seedElement.classList.remove('copied');
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy seed: ', err);
+                alert('Fehler beim Kopieren des Seeds');
+            });
+        });
+    }
+
+    // Add event listener for copy button
+    document.getElementById('copyResults').addEventListener('click', async () => {
+        try {
+            // Create a temporary container for the HTML content
+            const tempContainer = document.createElement('div');
+            tempContainer.innerHTML = resultsHTML;
+            
+            // Create a Blob with the HTML content
+            const blob = new Blob([tempContainer.innerHTML], { type: 'text/html' });
+            
+            // Create a ClipboardItem with the Blob
+            const data = new ClipboardItem({
+                'text/html': blob,
+            });
+            
+            // Write both HTML and plain text to clipboard
+            await navigator.clipboard.write([data]);
+            
+            const button = document.getElementById('copyResults');
+            const originalText = button.textContent;
+            button.textContent = 'Kopiert!';
+            button.classList.add('copied');
+            setTimeout(() => {
+                button.textContent = originalText;
+                button.classList.remove('copied');
+            }, 2000);
+        } catch (err) {
+            console.error('Failed to copy results: ', err);
+            alert('Fehler beim Kopieren der Ergebnisse');
+        }
+    });
+
+    // Add event listener for download button
+    document.getElementById('downloadResults').addEventListener('click', () => {
         const jsonStr = JSON.stringify(results, null, 4);
         const blob = new Blob([jsonStr], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'lottery-results.json';
+        a.download = `${filename}.json`;
         a.click();
         URL.revokeObjectURL(url);
-    } catch (error) {
-        document.getElementById('results').textContent = `Error: ${error.message}`;
-    }
+    });
 }
+
 
 // Initialize the UI when the page loads
 document.addEventListener('DOMContentLoaded', () => {
-    // Set up the example data
-    document.getElementById('jsonInput').value = JSON.stringify(exampleData, null, 4);
-    
-    // Set up the run button
-    document.querySelector('button').onclick = () => runLottery();
+    const form = document.getElementById('lotteryForm');
+    const paketsContainer = document.getElementById('pakets-container');
+    const addPaketButton = document.getElementById('addPaket');
+    const drawButton = document.getElementById('drawButton');
+    let paketCounter = 1;
+
+    // Format date to German format
+    function formatDate(date) {
+        const months = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = months[date.getMonth()];
+        const year = date.getFullYear();
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        return `${day} ${month} ${year} ${hours}:${minutes}`;
+    }
+
+    // Create a new participant input
+    function createParticipantInput() {
+        const div = document.createElement('div');
+        div.className = 'participant-input';
+        div.innerHTML = `
+            <input type="text" placeholder="Teilnehmer Name" class="participant-name">
+            <button type="button" class="remove-participant">×</button>
+        `;
+        return div;
+    }
+
+    // Update remove buttons visibility
+    function updateRemoveButtons() {
+        // Update participant remove buttons
+        document.querySelectorAll('.participants-container').forEach(container => {
+            const inputs = container.querySelectorAll('.participant-input');
+            inputs.forEach((input, index) => {
+                const removeButton = input.querySelector('.remove-participant');
+                removeButton.style.display = inputs.length > 1 ? 'flex' : 'none';
+            });
+        });
+
+        // Update paket remove buttons
+        const pakets = document.querySelectorAll('.paket');
+        pakets.forEach(paket => {
+            const removeButton = paket.querySelector('.remove-paket');
+            removeButton.style.display = pakets.length > 1 ? 'flex' : 'none';
+        });
+    }
+
+    // Update draw button state
+    function updateDrawButton() {
+        const lotteryNumber = document.getElementById('lotteryNumber').value.trim();
+        const lotteryName = document.getElementById('lotteryName').value.trim();
+        const timestamp = document.getElementById('timestamp').value;
+        const pakets = document.querySelectorAll('.paket');
+        
+        // Check if we have at least one paket
+        if (pakets.length === 0) {
+            drawButton.disabled = true;
+            return;
+        }
+
+        // Check if all pakets have at least one participant
+        const allPaketsHaveParticipants = Array.from(pakets).every(paket => {
+            const participants = paket.querySelectorAll('.participant-name');
+            return Array.from(participants).some(input => input.value.trim());
+        });
+
+        // Enable button only if all conditions are met
+        drawButton.disabled = !(lotteryNumber && lotteryName && timestamp && allPaketsHaveParticipants);
+    }
+
+    // Add event listeners for title and timestamp changes
+    document.getElementById('lotteryNumber').addEventListener('input', updateDrawButton);
+    document.getElementById('lotteryName').addEventListener('input', updateDrawButton);
+    document.getElementById('timestamp').addEventListener('change', updateDrawButton);
+
+    // Handle participant input events
+    paketsContainer.addEventListener('input', (event) => {
+        if (event.target.classList.contains('participant-name') || 
+            event.target.classList.contains('paket-title')) {
+            updateDrawButton();
+        }
+    });
+
+    // Add new participant input when Enter is pressed
+    function handleParticipantInput(event) {
+        if (event.key === 'Enter' && event.target.value.trim()) {
+            event.preventDefault();
+            const participantsContainer = event.target.closest('.participants-container');
+            addNewParticipant(participantsContainer);
+        }
+    }
+
+    // Handle participant input events
+    paketsContainer.addEventListener('keydown', (event) => {
+        if (event.target.classList.contains('participant-name')) {
+            handleParticipantInput(event);
+        }
+    });
+
+    // Handle paket container clicks
+    paketsContainer.addEventListener('click', (event) => {
+        if (event.target.classList.contains('remove-paket')) {
+            removePaket(event);
+        } else if (event.target.classList.contains('remove-participant')) {
+            removeParticipant(event);
+        } else if (event.target.classList.contains('add-participant')) {
+            const participantsContainer = event.target.closest('.participants-container');
+            addNewParticipant(participantsContainer);
+        }
+    });
+
+    // Add new participant input
+    function addNewParticipant(participantsContainer) {
+        // Remove the add button temporarily
+        const addButton = participantsContainer.querySelector('.add-participant');
+        addButton.remove();
+        
+        // Add the new participant input
+        const newInput = createParticipantInput();
+        participantsContainer.appendChild(newInput);
+        newInput.querySelector('input').focus();
+        
+        // Add the button back at the bottom
+        participantsContainer.appendChild(addButton);
+        
+        updateRemoveButtons();
+        updateDrawButton();
+    }
+
+    // Remove participant input
+    function removeParticipant(event) {
+        const participantInput = event.target.closest('.participant-input');
+        const participantsContainer = participantInput.closest('.participants-container');
+        if (participantsContainer.children.length > 1) {
+            participantInput.remove();
+            updateRemoveButtons();
+            updateDrawButton();
+        }
+    }
+
+    // Renumber all pakets
+    function renumberPakets() {
+        const pakets = document.querySelectorAll('.paket');
+        pakets.forEach((paket, index) => {
+            const newNumber = index + 1;
+            paket.dataset.paketId = newNumber;
+            paket.querySelector('h3').textContent = `Paket #${newNumber}`;
+        });
+        paketCounter = pakets.length;
+    }
+
+    // Remove paket
+    function removePaket(event) {
+        const paket = event.target.closest('.paket');
+        const paketsContainer = paket.closest('#pakets-container');
+        if (paketsContainer.children.length > 1) {
+            paket.remove();
+            renumberPakets();
+            updateRemoveButtons();
+            updateDrawButton();
+        }
+    }
+
+    // Create a new paket
+    function createPaket() {
+        paketCounter++;
+        const paket = document.createElement('div');
+        paket.className = 'paket';
+        paket.dataset.paketId = paketCounter;
+        paket.innerHTML = `
+            <div class="paket-header">
+                <h3>Paket #${paketCounter}</h3>
+                <input type="text" class="paket-title" placeholder="Titel des Pakets" required>
+                <button type="button" class="remove-paket">×</button>
+            </div>
+            <div class="participants-container">
+                ${createParticipantInput().outerHTML}
+                <button type="button" class="add-participant">+ Neuer Teilnehmer</button>
+            </div>
+        `;
+        return paket;
+    }
+
+    // Add new paket
+    addPaketButton.addEventListener('click', () => {
+        const newPaket = createPaket();
+        paketsContainer.appendChild(newPaket);
+        newPaket.querySelector('input').focus();
+        updateRemoveButtons();
+        updateDrawButton();
+    });
+
+    // Handle draw button click
+    drawButton.addEventListener('click', async () => {
+        try {
+            const lotteryNumber = document.getElementById('lotteryNumber').value.trim();
+            const lotteryName = document.getElementById('lotteryName').value.trim();
+            const title = `Verlosung ${lotteryNumber}: ${lotteryName}`;
+            
+            // Get the raw timestamp value and ensure it's in ISO-8601 format with timezone
+            const timestampInput = document.getElementById('timestamp').value;
+            const timestamp = new Date(timestampInput).toISOString();
+            
+            const pakets = Array.from(document.querySelectorAll('.paket')).map(paket => {
+                const participants = Array.from(paket.querySelectorAll('.participant-name'))
+                    .map(input => ({
+                        name: input.value.trim(),
+                        tickets: 1  // Each participant gets 1 ticket by default
+                    }))
+                    .filter(p => p.name);
+                const paketTitle = paket.querySelector('.paket-title').value.trim();
+                
+                if (!paketTitle) {
+                    throw new Error('Bitte geben Sie für jedes Paket einen Titel ein.');
+                }
+                
+                return {
+                    title: paketTitle,
+                    participants
+                };
+            });
+
+            // Create lottery data
+            const lotteryData = {
+                title,
+                timestamp,
+                packets: pakets
+            };
+
+            // Create and run lottery
+            const lottery = new Lottery(lotteryData);
+            await lottery.initialize();
+            const results = await lottery.draw();
+
+            // Display results in HTML format
+            displayResults(results);
+        } catch (error) {
+            document.getElementById('results').innerHTML = `
+                <div class="error-message">
+                    <h3>Fehler</h3>
+                    <p>${error.message}</p>
+                </div>
+            `;
+        }
+    });
+
+    // Initialize remove buttons visibility
+    updateRemoveButtons();
+    // Initialize button state
+    updateDrawButton();
 }); 

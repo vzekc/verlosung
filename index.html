@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Verlosung</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Verlosung</h1>
+        <form id="lotteryForm">
+            <div class="form-group">
+                <label for="lotteryNumber">Nummer der Verlosung:</label>
+                <input type="number" id="lotteryNumber" min="100" max="9999" required placeholder="z.B. 1234">
+            </div>
+            <div class="form-group">
+                <label for="lotteryName">Name der Verlosung:</label>
+                <input type="text" id="lotteryName" required placeholder="z.B. Classic Computing Tombola 2024">
+            </div>
+            <div class="form-group">
+                <label for="timestamp">Datum und Uhrzeit:</label>
+                <input type="datetime-local" id="timestamp" required>
+            </div>
+            
+            <div id="pakets-container">
+                <div class="paket" data-paket-id="1">
+                    <div class="paket-header">
+                        <h3>Paket #1</h3>
+                        <input type="text" class="paket-title" placeholder="Titel des Pakets" required>
+                        <button type="button" class="remove-paket" style="display: none;">×</button>
+                    </div>
+                    <div class="participants-container">
+                        <div class="participant-input">
+                            <input type="text" placeholder="Teilnehmer Name" class="participant-name">
+                            <button type="button" class="remove-participant">×</button>
+                        </div>
+                        <button type="button" class="add-participant">+ Neuer Teilnehmer</button>
+                    </div>
+                </div>
+            </div>
+            
+            <button type="button" id="addPaket">+ Neues Paket</button>
+            <button type="button" id="drawButton" disabled>Verlosung durchführen</button>
+        </form>
+        
+        <div id="results" class="results-container"></div>
+    </div>
+    <script type="module" src="app.js"></script>
+</body>
+</html> 
