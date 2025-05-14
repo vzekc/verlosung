@@ -1,0 +1,6 @@
+{
+  "name": "verlosung",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Lottery system with Python-compatible PRNG"
+} 

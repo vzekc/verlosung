@@ -9,6 +9,7 @@
 import difflib
 import hashlib
 import json
+import os
 import random
 import sys
 from collections import Counter
@@ -27,7 +28,15 @@ class VzEkC:
             packets: List of packets with participants and their tickets
         """
         self.title = title
+        self.timestamp = timestamp
         self.drawings = []
+        self.results = {
+            "title": title,
+            "timestamp": timestamp,  # Original timestamp from input
+            "drawingTimestamp": None,  # Will be set when drawing happens
+            "rngSeed": None,  # Will be set when RNG is initialized
+            "packets": []
+        }
         
         # Convert the new format to the internal format
         for packet in packets:
@@ -38,7 +47,8 @@ class VzEkC:
             
             self.drawings.append({
                 'text': packet['title'],
-                'names': names
+                'names': names,
+                'original_packet': packet
             })
         
         self.drawings = sorted(self.drawings, key=lambda x: x['text'])
@@ -60,7 +70,6 @@ class VzEkC:
         else:
             raise ValueError("Timestamp must include a timezone offset, e.g. 2025-01-25T13:32:00+01:00")
         timestamp_str = str(int(dt_utc.timestamp()))
-        print(f"DEBUG: timestamp_str used for seed: {timestamp_str}")
         
         # Start hash with the timestamp
         m = hashlib.sha3_512()
@@ -73,42 +82,54 @@ class VzEkC:
                 all_names.add(name)
                 m.update(bytes(name, encoding='UTF-8'))
 
-        # Output all participants sorted
-        all_names = sorted(all_names)
-        self.out(f'Title: {self.title}')
-        self.out(f'All participants: {", ".join(all_names)}')
+        # Get seed value for verification
+        self.seed = m.hexdigest()
+        self.results["rngSeed"] = self.seed
+        return random.Random(self.seed)
 
-        # Output seed value for verification
-        seed = m.hexdigest()
-        self.out(
-            f'(Using pseudo-random number generator'
-            f' Version {random.Random.VERSION} with seed={seed!r})'
-        )
-        return random.Random(seed)
-
-    def _print_result(self, *, text, names):
+    def _print_result(self, *, text, names, original_packet):
         """
-        Gibt die Gewinner eines Pakets aus.
+        Prints the result for one packet and updates the results dictionary.
         """
-        self.out('_' * 100)
-        self.out(f'Verlosung von: *** {text} ***')
-
-        names.sort()  # Alle Namen sortieren
-
-        # Auflisten der "Lose":
+        names.sort()  # Sort all names
         c = Counter(names)
-        for user, count in c.items():
-            self.out(f' * {user} hat {count} Lose gekauft')
+        
+        # Print participants and winner in a simple format
+        participants = [f"{user} ({count})" for user, count in c.items()]
+        winner = self.rnd.choice(names)
+        self.out(f"{text}: {', '.join(participants)} → {winner}")
 
-        self.out('Alle Lose/Namen im Topf:', names)
-        self.out(f'Gewinner ist: *** {self.rnd.choice(names)} ***')
+        # Update results dictionary
+        packet_result = original_packet.copy()
+        packet_result['winner'] = winner
+        self.results['packets'].append(packet_result)
 
     def print_drawing(self):
         """
-        Gib die Gewinner aller Pakete aus.
+        Print the drawing results and save to JSON file.
         """
-        for drawings in self.drawings:
-            self._print_result(**drawings)
+        # Print header
+        dt = datetime.fromisoformat(self.timestamp)
+        dt_utc = dt.astimezone(timezone.utc)
+        epoch_time = int(dt_utc.timestamp())
+        drawing_timestamp = datetime.now(dt.tzinfo).isoformat()
+        self.results["drawingTimestamp"] = drawing_timestamp
+        
+        self.out(f"{self.title}")
+        self.out(f"Zeitpunkt: {self.timestamp} ({epoch_time})")
+        self.out(f"Seed: {self.seed}")
+        self.out()
+
+        # Print results for each packet
+        for drawing in self.drawings:
+            self._print_result(**drawing)
+
+        # Save results to JSON file
+        input_basename = os.path.splitext(sys.argv[1])[0]
+        output_file = f"{input_basename}-results.json"
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump(self.results, f, indent=4, ensure_ascii=False)
+        self.out(f'\nErgebnisse wurden in {output_file} gespeichert.')
 
 
 def load_lottery_data(json_file: str) -> Dict:
