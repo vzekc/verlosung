@@ -53,8 +53,9 @@ function getResultsHTML(results) {
 }
 
 function createFilename(title) {
-  // Convert to lowercase and replace spaces with hyphens
+  // Remove "Verlosung Spende" prefix if it exists
   let filename = title
+    .replace(/^Verlosung Spende\s*\d*:?\s*/, '')
     .toLowerCase()
     // Replace spaces and special characters with hyphens
     .replace(/[^a-z0-9]+/g, '-')
@@ -68,6 +69,34 @@ function createFilename(title) {
   return `verlosung-${filename}-${timestamp}`
 }
 
+// Function to reset lottery data to edit mode
+function resetToEditMode() {
+  console.log('resetToEditMode: Starting...')
+
+  // Load current data from localStorage
+  const savedData = loadLotteryData()
+  if (!savedData) {
+    console.error('resetToEditMode: No data found in localStorage')
+    return
+  }
+
+  // Create a copy of the data without the drawings
+  const editData = {
+    title: savedData.title,
+    packets: savedData.packets,
+    timestamp: savedData.timestamp,
+  }
+
+  // Save the modified data back to localStorage
+  console.log('resetToEditMode: Saving modified data to localStorage')
+  localStorage.setItem('lotteryData', JSON.stringify(editData))
+
+  // Reinitialize the app with the modified data
+  console.log('resetToEditMode: Reinitializing app')
+  initializeApp(editData)
+}
+
+// Function to display results
 function displayResults(results) {
   const filename = createFilename(results.title)
   const resultsHTML = getResultsHTML(results)
@@ -78,8 +107,32 @@ function displayResults(results) {
         <div class="results-actions">
             <button type="button" id="copyResults" class="action-button">Ergebnisse kopieren</button>
             <button type="button" id="downloadResults" class="action-button">JSON herunterladen</button>
+            <button type="button" id="editParticipants" class="action-button edit-button">Teilnehmer ändern</button>
         </div>
     `
+
+  // Show the results container
+  resultsContainer.style.display = 'block'
+
+  // Hide the form
+  const form = document.getElementById('lotteryForm')
+  if (form && form.style) {
+    form.style.display = 'none'
+  }
+
+  // Add event listener for edit participants button
+  const editButton = document.getElementById('editParticipants')
+  if (editButton) {
+    editButton.addEventListener('click', () => {
+      if (
+        confirm(
+          'Möchtest Du die Teilnehmer ändern? Die aktuellen Ergebnisse werden dabei gelöscht.',
+        )
+      ) {
+        resetToEditMode()
+      }
+    })
+  }
 
   // Add event listener for seed copy
   const seedElement = resultsContainer.querySelector('.copyable-seed')
@@ -287,9 +340,7 @@ function initializeApp(data) {
         } else {
           packet.participants.forEach((participant, pIndex) => {
             if (!participant.name) {
-              validationErrors.push(
-                `Paket #${index + 1}, Teilnehmer #${pIndex + 1}: Name fehlt`,
-              )
+              validationErrors.push(`Paket #${index + 1}, Teilnehmer #${pIndex + 1}: Name fehlt`)
             }
           })
         }
@@ -386,54 +437,47 @@ function loadLotteryData() {
 // Function to make the form read-only
 function makeFormReadOnly() {
   console.log('makeFormReadOnly: Starting...')
-  
-  // Remove all delete buttons except the clear-lottery button
-  const buttons = document.querySelectorAll('.remove-paket, .remove-participant, .add-participant')
-  console.log('makeFormReadOnly: Found buttons to remove:', buttons.length)
-  buttons.forEach(button => {
-    if (button) {
-      console.log('makeFormReadOnly: Removing button:', button.className)
-      button.remove()
-    }
-  })
 
-  // Make all inputs read-only
-  const inputs = document.querySelectorAll('input')
-  console.log('makeFormReadOnly: Found inputs:', inputs.length)
-  inputs.forEach(input => {
-    if (input) {
-      console.log('makeFormReadOnly: Making input read-only:', input.id || input.className)
-      input.readOnly = true
-      input.classList.add('readonly')
-    }
-  })
-
-  // Hide the add paket button if it exists
-  const addPaketButton = document.getElementById('addPaket')
-  console.log('makeFormReadOnly: Add paket button exists:', !!addPaketButton)
-  if (addPaketButton && addPaketButton.style) {
-    console.log('makeFormReadOnly: Hiding add paket button')
-    addPaketButton.style.display = 'none'
-  }
-
-  // Hide the draw button if it exists
-  const drawButton = document.getElementById('drawButton')
-  console.log('makeFormReadOnly: Draw button exists:', !!drawButton)
-  if (drawButton && drawButton.style) {
-    console.log('makeFormReadOnly: Hiding draw button')
-    drawButton.style.display = 'none'
-  }
-
-  // Hide the form if it exists
+  // Hide the entire form
   const form = document.getElementById('lotteryForm')
   console.log('makeFormReadOnly: Form exists:', !!form)
   if (form && form.style) {
-    console.log('makeFormReadOnly: Making form read-only')
-    form.style.opacity = '0.7'
-    form.style.pointerEvents = 'none'
+    console.log('makeFormReadOnly: Hiding form')
+    form.style.display = 'none'
   }
-  
+
+  // Show the results container
+  const resultsContainer = document.getElementById('results')
+  console.log('makeFormReadOnly: Results container exists:', !!resultsContainer)
+  if (resultsContainer && resultsContainer.style) {
+    console.log('makeFormReadOnly: Showing results container')
+    resultsContainer.style.display = 'block'
+  }
+
   console.log('makeFormReadOnly: Completed')
+}
+
+// Function to make the form editable
+function makeFormEditable() {
+  console.log('makeFormEditable: Starting...')
+
+  // Show the form
+  const form = document.getElementById('lotteryForm')
+  console.log('makeFormEditable: Form exists:', !!form)
+  if (form && form.style) {
+    console.log('makeFormEditable: Showing form')
+    form.style.display = 'block'
+  }
+
+  // Hide the results container
+  const resultsContainer = document.getElementById('results')
+  console.log('makeFormEditable: Results container exists:', !!resultsContainer)
+  if (resultsContainer && resultsContainer.style) {
+    console.log('makeFormEditable: Hiding results container')
+    resultsContainer.style.display = 'none'
+  }
+
+  console.log('makeFormEditable: Completed')
 }
 
 // Function to populate form with saved data
@@ -452,83 +496,86 @@ function populateFormWithData(data) {
   console.log('populateFormWithData: Updating page title')
   updatePageTitle(data.title)
 
-  // Extract lottery number and name from title
-  // Title format: "Verlosung Spende {number}: {name}"
-  const titleMatch = data.title.match(/^Verlosung Spende\s+(\d+):\s+(.+)$/)
-  if (titleMatch) {
-    const [, number, name] = titleMatch
-    document.getElementById('lotteryNumber').value = number
-    document.getElementById('lotteryName').value = name
+  if (isResultsFile) {
+    // For results files, just display the results
+    console.log('populateFormWithData: Displaying results')
+    displayResults(data)
+    makeFormReadOnly()
   } else {
-    // If title doesn't match expected format, try to extract what we can
-    const numberMatch = data.title.match(/\d+/)
-    if (numberMatch) {
-      document.getElementById('lotteryNumber').value = numberMatch[0]
+    // For normal lottery data, populate the form
+    console.log('populateFormWithData: Populating form')
+    makeFormEditable()
+
+    // Extract lottery number and name from title
+    // Title format: "Verlosung Spende {number}: {name}"
+    const titleMatch = data.title.match(/^Verlosung Spende\s+(\d+):\s+(.+)$/)
+    if (titleMatch) {
+      const [, number, name] = titleMatch
+      document.getElementById('lotteryNumber').value = number
+      document.getElementById('lotteryName').value = name
+    } else {
+      // If title doesn't match expected format, try to extract what we can
+      const numberMatch = data.title.match(/\d+/)
+      if (numberMatch) {
+        document.getElementById('lotteryNumber').value = numberMatch[0]
+      }
+      // Try to get the name part after any number
+      const nameMatch = data.title.replace(/^Verlosung Spende\s*\d*:?\s*/, '')
+      if (nameMatch) {
+        document.getElementById('lotteryName').value = nameMatch
+      }
     }
-    // Try to get the name part after any number
-    const nameMatch = data.title.replace(/^Verlosung Spende\s*\d*:?\s*/, '')
-    if (nameMatch) {
-      document.getElementById('lotteryName').value = nameMatch
+
+    // Set timestamp
+    if (data.timestamp) {
+      const date = new Date(data.timestamp)
+      // Convert to local timezone for datetime-local input
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      const hours = String(date.getHours()).padStart(2, '0')
+      const minutes = String(date.getMinutes()).padStart(2, '0')
+      document.getElementById('timestamp').value = `${year}-${month}-${day}T${hours}:${minutes}`
     }
-  }
 
-  // Set timestamp
-  if (data.timestamp) {
-    const date = new Date(data.timestamp)
-    // Convert to local timezone for datetime-local input
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-    const hours = String(date.getHours()).padStart(2, '0')
-    const minutes = String(date.getMinutes()).padStart(2, '0')
-    document.getElementById('timestamp').value = `${year}-${month}-${day}T${hours}:${minutes}`
-  }
+    // Clear existing pakets
+    const paketsContainer = document.getElementById('pakets-container')
+    console.log('populateFormWithData: Pakets container exists:', !!paketsContainer)
+    paketsContainer.innerHTML = ''
 
-  // Clear existing pakets
-  const paketsContainer = document.getElementById('pakets-container')
-  console.log('populateFormWithData: Pakets container exists:', !!paketsContainer)
-  paketsContainer.innerHTML = ''
+    // Add saved pakets
+    data.packets.forEach((paket) => {
+      const newPaket = createPaket()
+      const paketTitleInput = newPaket.querySelector('.paketTitle')
+      paketTitleInput.value = paket.title
 
-  // Add saved pakets
-  data.packets.forEach((paket) => {
-    const newPaket = createPaket()
-    const paketTitleInput = newPaket.querySelector('.paketTitle')
-    paketTitleInput.value = paket.title
+      // Remove default participant input
+      const participantsContainer = newPaket.querySelector('.participants-container')
+      participantsContainer.innerHTML = ''
 
-    // Remove default participant input
-    const participantsContainer = newPaket.querySelector('.participants-container')
-    participantsContainer.innerHTML = ''
+      // Add saved participants
+      paket.participants.forEach((participant) => {
+        const participantInput = createParticipantInput()
+        participantInput.querySelector('input').value = participant.name
+        participantsContainer.appendChild(participantInput)
+      })
 
-    // Add saved participants
-    paket.participants.forEach((participant) => {
-      const participantInput = createParticipantInput()
-      participantInput.querySelector('input').value = participant.name
-      participantsContainer.appendChild(participantInput)
-    })
-
-    // Only add the "add participant" button if this is not a results file
-    if (!isResultsFile) {
+      // Add the "add participant" button
       const addButton = document.createElement('button')
       addButton.type = 'button'
       addButton.className = 'add-participant'
       addButton.textContent = '+ Neuer Teilnehmer'
       participantsContainer.appendChild(addButton)
-    }
 
-    paketsContainer.appendChild(newPaket)
-  })
+      paketsContainer.appendChild(newPaket)
+    })
 
-  // If this is a results file, make the form read-only
-  if (isResultsFile) {
-    console.log('populateFormWithData: Making form read-only')
-    makeFormReadOnly()
-  } else {
     // Update UI state for normal lottery data
     console.log('populateFormWithData: Updating UI state')
     updateRemoveButtons()
     updateDrawButton()
   }
-  
+
   console.log('populateFormWithData: Completed')
 }
 
@@ -882,18 +929,40 @@ document.addEventListener('drop', (e) => {
 // Initialize the UI when the page loads
 document.addEventListener('DOMContentLoaded', () => {
   console.log('DOMContentLoaded: Starting initialization')
-  
+
   const form = document.getElementById('lotteryForm')
   console.log('DOMContentLoaded: Form exists:', !!form)
-  
+
   const paketsContainer = document.getElementById('pakets-container')
   console.log('DOMContentLoaded: Pakets container exists:', !!paketsContainer)
-  
+
   const addPaketButton = document.getElementById('addPaket')
   console.log('DOMContentLoaded: Add paket button exists:', !!addPaketButton)
-  
+
   const drawButton = document.getElementById('drawButton')
   console.log('DOMContentLoaded: Draw button exists:', !!drawButton)
+
+  // Initially hide the results container
+  const resultsContainer = document.getElementById('results')
+  console.log('DOMContentLoaded: Results container exists:', !!resultsContainer)
+  if (resultsContainer && resultsContainer.style) {
+    console.log('DOMContentLoaded: Initially hiding results container')
+    resultsContainer.style.display = 'none'
+  }
+
+  // Add download button event listener
+  const downloadButton = document.getElementById('downloadLottery')
+  console.log('DOMContentLoaded: Download button exists:', !!downloadButton)
+  if (downloadButton) {
+    downloadButton.addEventListener('click', () => {
+      try {
+        downloadLotteryData()
+      } catch (error) {
+        console.error('Error downloading lottery data:', error)
+        alert('Fehler beim Herunterladen der Daten')
+      }
+    })
+  }
 
   // Focus the lottery number input
   const lotteryNumberInput = document.getElementById('lotteryNumber')
@@ -1130,8 +1199,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const results = await lottery.draw()
       console.log('Drawing complete, results:', results)
 
-      // Display results in HTML format
-      displayResults(results)
+      // Store results in localStorage
+      console.log('Storing results in localStorage')
+      localStorage.setItem('lotteryData', JSON.stringify(results))
+
+      // Reinitialize the app with the results to make it read-only
+      console.log('Reinitializing app with results')
+      initializeApp(results)
     } catch (error) {
       console.error('Error in draw process:', error)
       document.getElementById('results').innerHTML = `
@@ -1220,6 +1294,20 @@ document.addEventListener('DOMContentLoaded', () => {
       })
     }
   })
-  
+
   console.log('DOMContentLoaded: Completed initialization')
 })
+
+// Function to download lottery data
+function downloadLotteryData() {
+  const data = makeLotteryData()
+  const filename = createFilename(data.title)
+  const jsonStr = JSON.stringify(data, null, 4)
+  const blob = new Blob([jsonStr], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${filename}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+}
