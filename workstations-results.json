@@ -1,0 +1,110 @@
+{
+    "title": "Classic Computing Tombola 2024",
+    "timestamp": "2025-01-25T11:52:00+00:00",
+    "drawingTimestamp": "2025-05-14T05:07:16.634715+00:00",
+    "rngSeed": "e70f11645243486294782d0eda878f01bdeb4aae8dcfa7dc7955582af6810e77fef73c9afbf7b740ec092c7ce0dc9b429da95035d580bf7c7056f2b8376ff261",
+    "packets": [
+        {
+            "title": "Paket #1 SS2",
+            "participants": [
+                {
+                    "name": "@obsd_guru",
+                    "tickets": 1
+                },
+                {
+                    "name": "@tuti",
+                    "tickets": 1
+                },
+                {
+                    "name": "@Cobalt60",
+                    "tickets": 1
+                },
+                {
+                    "name": "@gnupublic",
+                    "tickets": 1
+                }
+            ],
+            "winner": "@obsd_guru"
+        },
+        {
+            "title": "Paket #2 SS10",
+            "participants": [
+                {
+                    "name": "@obsd_guru",
+                    "tickets": 1
+                },
+                {
+                    "name": "@tuti",
+                    "tickets": 1
+                },
+                {
+                    "name": "@Cobalt60",
+                    "tickets": 1
+                },
+                {
+                    "name": "@gnupublic",
+                    "tickets": 1
+                }
+            ],
+            "winner": "@gnupublic"
+        },
+        {
+            "title": "Paket #3 V4K+Disks",
+            "participants": [
+                {
+                    "name": "@Hans",
+                    "tickets": 1
+                },
+                {
+                    "name": "@Schroeder",
+                    "tickets": 1
+                },
+                {
+                    "name": "@obsd_guru",
+                    "tickets": 1
+                },
+                {
+                    "name": "@gnupublic",
+                    "tickets": 1
+                }
+            ],
+            "winner": "@gnupublic"
+        },
+        {
+            "title": "Paket #4 V4K",
+            "participants": [
+                {
+                    "name": "@Hans",
+                    "tickets": 1
+                },
+                {
+                    "name": "@Schroeder",
+                    "tickets": 1
+                },
+                {
+                    "name": "@obsd_guru",
+                    "tickets": 1
+                },
+                {
+                    "name": "@gnupublic",
+                    "tickets": 1
+                }
+            ],
+            "winner": "@Schroeder"
+        },
+        {
+            "title": "Paket #5 NetApp",
+            "participants": [
+                {
+                    "name": "@Schroeder",
+                    "tickets": 1
+                },
+                {
+                    "name": "@obsd_guru",
+                    "tickets": 1
+                }
+            ],
+            "winner": "@Schroeder"
+        }
+    ]
+}
