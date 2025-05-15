@@ -3,6 +3,9 @@ import { Lottery } from './lottery.js'
 // Global counter for pakets
 let paketCounter = 1
 
+// Add a flag to track if we're currently initializing/populating the form
+let isInitializing = false
+
 function shortenSeed(seed) {
   if (seed.length <= 16) return seed
   return `${seed.substring(0, 8)}...${seed.substring(seed.length - 8)}`
@@ -480,99 +483,121 @@ function makeFormEditable() {
   console.log('makeFormEditable: Completed')
 }
 
-// Function to populate form with saved data
+// Add a function to clear all validation messages
+function clearAllValidationMessages() {
+  console.log('[clearAllValidationMessages] Clearing all validation messages')
+  document.querySelectorAll('.validation-message').forEach((element) => {
+    element.style.display = 'none'
+    element.classList.remove('show')
+    element.textContent = ''
+  })
+}
+
 function populateFormWithData(data) {
-  console.log('populateFormWithData: Starting with data:', data)
-  if (!data) {
-    console.log('populateFormWithData: No data provided')
-    return
-  }
+  console.log('[populateFormWithData] Starting with data:', {
+    title: data.title,
+    hasDrawings: Array.isArray(data.drawings),
+    lotteryNumber: data.title.match(/^Verlosung Spende\s+(\d+):\s+(.+)$/)?.[1],
+  })
 
-  // Check if this is a results file (has drawings)
-  const isResultsFile = Array.isArray(data.drawings)
-  console.log('populateFormWithData: Is results file:', isResultsFile)
+  isInitializing = true // Set flag before populating form
+  clearAllValidationMessages() // Clear any existing validation messages
 
-  // Update page title with saved title
-  console.log('populateFormWithData: Updating page title')
-  updatePageTitle(data.title)
+  try {
+    // Check if this is a results file (has drawings)
+    const isResultsFile = Array.isArray(data.drawings)
+    console.log('populateFormWithData: Is results file:', isResultsFile)
 
-  if (isResultsFile) {
-    // For results files, just display the results
-    console.log('populateFormWithData: Displaying results')
-    displayResults(data)
-    makeFormReadOnly()
-  } else {
-    // For normal lottery data, populate the form
-    console.log('populateFormWithData: Populating form')
-    makeFormEditable()
+    // Update page title with saved title
+    console.log('populateFormWithData: Updating page title')
+    updatePageTitle(data.title)
 
-    // Extract lottery number and name from title
-    // Title format: "Verlosung Spende {number}: {name}"
-    const titleMatch = data.title.match(/^Verlosung Spende\s+(\d+):\s+(.+)$/)
-    if (titleMatch) {
-      const [, number, name] = titleMatch
-      document.getElementById('lotteryNumber').value = number
-      document.getElementById('lotteryName').value = name
+    if (isResultsFile) {
+      // For results files, just display the results
+      console.log('populateFormWithData: Displaying results')
+      displayResults(data)
+      makeFormReadOnly()
     } else {
-      // If title doesn't match expected format, try to extract what we can
-      const numberMatch = data.title.match(/\d+/)
-      if (numberMatch) {
-        document.getElementById('lotteryNumber').value = numberMatch[0]
+      // For normal lottery data, populate the form
+      console.log('populateFormWithData: Populating form')
+      makeFormEditable()
+
+      // Extract lottery number and name from title
+      const titleMatch = data.title.match(/^Verlosung Spende\s+(\d+):\s+(.+)$/)
+      if (titleMatch) {
+        const [, number, name] = titleMatch
+        console.log('[populateFormWithData] Setting lottery number:', {
+          number,
+          name,
+          elementExists: !!document.getElementById('lotteryNumber'),
+        })
+        document.getElementById('lotteryNumber').value = number
+        document.getElementById('lotteryName').value = name
+      } else {
+        // If title doesn't match expected format, try to extract what we can
+        const numberMatch = data.title.match(/\d+/)
+        if (numberMatch) {
+          document.getElementById('lotteryNumber').value = numberMatch[0]
+        }
+        // Try to get the name part after any number
+        const nameMatch = data.title.replace(/^Verlosung Spende\s*\d*:?\s*/, '')
+        if (nameMatch) {
+          document.getElementById('lotteryName').value = nameMatch
+        }
       }
-      // Try to get the name part after any number
-      const nameMatch = data.title.replace(/^Verlosung Spende\s*\d*:?\s*/, '')
-      if (nameMatch) {
-        document.getElementById('lotteryName').value = nameMatch
+
+      // Set timestamp
+      if (data.timestamp) {
+        const date = new Date(data.timestamp)
+        // Convert to local timezone for datetime-local input
+        const year = date.getFullYear()
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        const hours = String(date.getHours()).padStart(2, '0')
+        const minutes = String(date.getMinutes()).padStart(2, '0')
+        document.getElementById('timestamp').value = `${year}-${month}-${day}T${hours}:${minutes}`
       }
-    }
 
-    // Set timestamp
-    if (data.timestamp) {
-      const date = new Date(data.timestamp)
-      // Convert to local timezone for datetime-local input
-      const year = date.getFullYear()
-      const month = String(date.getMonth() + 1).padStart(2, '0')
-      const day = String(date.getDate()).padStart(2, '0')
-      const hours = String(date.getHours()).padStart(2, '0')
-      const minutes = String(date.getMinutes()).padStart(2, '0')
-      document.getElementById('timestamp').value = `${year}-${month}-${day}T${hours}:${minutes}`
-    }
+      // Clear existing pakets
+      const paketsContainer = document.getElementById('pakets-container')
+      console.log('populateFormWithData: Pakets container exists:', !!paketsContainer)
+      paketsContainer.innerHTML = ''
 
-    // Clear existing pakets
-    const paketsContainer = document.getElementById('pakets-container')
-    console.log('populateFormWithData: Pakets container exists:', !!paketsContainer)
-    paketsContainer.innerHTML = ''
+      // Add saved pakets
+      data.packets.forEach((paket) => {
+        const newPaket = createPaket()
+        const paketTitleInput = newPaket.querySelector('.paketTitle')
+        paketTitleInput.value = paket.title
 
-    // Add saved pakets
-    data.packets.forEach((paket) => {
-      const newPaket = createPaket()
-      const paketTitleInput = newPaket.querySelector('.paketTitle')
-      paketTitleInput.value = paket.title
+        // Remove default participant input
+        const participantsContainer = newPaket.querySelector('.participants-container')
+        participantsContainer.innerHTML = ''
 
-      // Remove default participant input
-      const participantsContainer = newPaket.querySelector('.participants-container')
-      participantsContainer.innerHTML = ''
+        // Add saved participants
+        paket.participants.forEach((participant) => {
+          const participantInput = createParticipantInput()
+          participantInput.querySelector('input').value = participant.name
+          participantsContainer.appendChild(participantInput)
+        })
 
-      // Add saved participants
-      paket.participants.forEach((participant) => {
-        const participantInput = createParticipantInput()
-        participantInput.querySelector('input').value = participant.name
-        participantsContainer.appendChild(participantInput)
+        // Add the "add participant" button
+        const addButton = document.createElement('button')
+        addButton.type = 'button'
+        addButton.className = 'add-participant'
+        addButton.textContent = '+ Neuer Teilnehmer'
+        participantsContainer.appendChild(addButton)
+
+        paketsContainer.appendChild(newPaket)
       })
 
-      // Add the "add participant" button
-      const addButton = document.createElement('button')
-      addButton.type = 'button'
-      addButton.className = 'add-participant'
-      addButton.textContent = '+ Neuer Teilnehmer'
-      participantsContainer.appendChild(addButton)
-
-      paketsContainer.appendChild(newPaket)
-    })
-
-    // Update UI state for normal lottery data
-    console.log('populateFormWithData: Updating UI state')
-    updateRemoveButtons()
+      // Update UI state for normal lottery data
+      console.log('populateFormWithData: Updating UI state')
+      updateRemoveButtons()
+      updateDrawButton()
+    }
+  } finally {
+    isInitializing = false // Reset flag after populating form
+    // Only update button state after initialization is complete
     updateDrawButton()
   }
 
@@ -600,8 +625,14 @@ function updateRemoveButtons() {
 
 // Update draw button state
 function updateDrawButton() {
+  // Skip button updates during initialization
+  if (isInitializing) {
+    console.log('[updateDrawButton] Skipping during initialization')
+    return
+  }
+
   const drawButton = document.getElementById('drawButton')
-  if (!drawButton) return // Exit if button doesn't exist yet
+  if (!drawButton) return
 
   // Get all required inputs
   const form = document.getElementById('lotteryForm')
@@ -686,7 +717,7 @@ function createParticipantInput() {
   div.className = 'participant-input'
   div.innerHTML = `
         <div class="input-wrapper">
-            <input type="text" placeholder="Teilnehmer Name" class="participantName" required minlength="2" maxlength="50" pattern="[a-zA-Z0-9_-]+">
+            <input type="text" placeholder="Teilnehmer Name" class="participantName" required minlength="2" maxlength="50" pattern="[a-zA-Z0-9_\\-]+">
             <div class="validation-message participantName-error"></div>
         </div>
         <button type="button" class="remove-participant">×</button>
@@ -749,6 +780,29 @@ const validationMessages = {
 
 // Function to validate a single input field
 function validateInput(input, errorElement, showError = true) {
+  // Skip validation during initialization unless explicitly requested
+  if (isInitializing && !showError) {
+    console.log(
+      `[validateInput] Skipping validation during initialization for ${input.id || input.className}`,
+    )
+    // Clear error message during initialization
+    if (errorElement) {
+      errorElement.style.display = 'none'
+      errorElement.classList.remove('show')
+      errorElement.textContent = ''
+    }
+    return true
+  }
+
+  console.log(`[validateInput] Starting validation for ${input.id || input.className}:`, {
+    value: input.value,
+    showError,
+    isRequired: input.required,
+    hasFocus: document.activeElement === input,
+    type: input.type,
+    isInitializing,
+  })
+
   const value = input.value.trim()
   let isValid = true
   let errorMessage = ''
@@ -760,6 +814,11 @@ function validateInput(input, errorElement, showError = true) {
 
   // Check required
   if (input.required && !value) {
+    console.log(`[validateInput] Required field validation failed for ${validationKey}:`, {
+      value,
+      hasFocus: document.activeElement === input,
+      showError,
+    })
     isValid = false
     errorMessage = validationMessages[validationKey]?.required || 'Dieses Feld ist erforderlich.'
   }
@@ -811,23 +870,15 @@ function validateInput(input, errorElement, showError = true) {
     }
   }
 
-  // Update error message display only if showError is true
-  if (errorElement && showError) {
-    // Create error element if it doesn't exist
-    if (!errorElement.parentNode) {
-      const formGroup =
-        input.closest('.form-group') ||
-        input.closest('.paket') ||
-        input.closest('.participants-container')
-      if (formGroup) {
-        // Create error element if it doesn't exist
-        const newErrorElement = document.createElement('div')
-        newErrorElement.className = errorElement.className
-        newErrorElement.id = errorElement.id
-        formGroup.appendChild(newErrorElement)
-        errorElement = newErrorElement
-      }
-    }
+  // Update error message display only if showError is true and we're not initializing
+  if (errorElement && showError && !isInitializing) {
+    console.log(`[validateInput] Updating error display for ${validationKey}:`, {
+      isValid,
+      showError,
+      hasFocus: document.activeElement === input,
+      errorMessage,
+      isInitializing,
+    })
 
     if (!isValid) {
       errorElement.textContent = errorMessage
@@ -836,6 +887,7 @@ function validateInput(input, errorElement, showError = true) {
     } else {
       errorElement.style.display = 'none'
       errorElement.classList.remove('show')
+      errorElement.textContent = ''
     }
   }
 
@@ -928,374 +980,416 @@ document.addEventListener('drop', (e) => {
 
 // Initialize the UI when the page loads
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('DOMContentLoaded: Starting initialization')
+  isInitializing = true // Set flag at start of initialization
 
-  const form = document.getElementById('lotteryForm')
-  console.log('DOMContentLoaded: Form exists:', !!form)
+  try {
+    console.log('DOMContentLoaded: Starting initialization')
 
-  const paketsContainer = document.getElementById('pakets-container')
-  console.log('DOMContentLoaded: Pakets container exists:', !!paketsContainer)
+    const form = document.getElementById('lotteryForm')
+    console.log('DOMContentLoaded: Form exists:', !!form)
 
-  const addPaketButton = document.getElementById('addPaket')
-  console.log('DOMContentLoaded: Add paket button exists:', !!addPaketButton)
+    const paketsContainer = document.getElementById('pakets-container')
+    console.log('DOMContentLoaded: Pakets container exists:', !!paketsContainer)
 
-  const drawButton = document.getElementById('drawButton')
-  console.log('DOMContentLoaded: Draw button exists:', !!drawButton)
+    const addPaketButton = document.getElementById('addPaket')
+    console.log('DOMContentLoaded: Add paket button exists:', !!addPaketButton)
 
-  // Initially hide the results container
-  const resultsContainer = document.getElementById('results')
-  console.log('DOMContentLoaded: Results container exists:', !!resultsContainer)
-  if (resultsContainer && resultsContainer.style) {
-    console.log('DOMContentLoaded: Initially hiding results container')
-    resultsContainer.style.display = 'none'
-  }
+    const drawButton = document.getElementById('drawButton')
+    console.log('DOMContentLoaded: Draw button exists:', !!drawButton)
 
-  // Add download button event listener
-  const downloadButton = document.getElementById('downloadLottery')
-  console.log('DOMContentLoaded: Download button exists:', !!downloadButton)
-  if (downloadButton) {
-    downloadButton.addEventListener('click', () => {
+    // Initially hide the results container
+    const resultsContainer = document.getElementById('results')
+    console.log('DOMContentLoaded: Results container exists:', !!resultsContainer)
+    if (resultsContainer && resultsContainer.style) {
+      console.log('DOMContentLoaded: Initially hiding results container')
+      resultsContainer.style.display = 'none'
+    }
+
+    // Add download button event listener
+    const downloadButton = document.getElementById('downloadLottery')
+    console.log('DOMContentLoaded: Download button exists:', !!downloadButton)
+    if (downloadButton) {
+      downloadButton.addEventListener('click', () => {
+        try {
+          downloadLotteryData()
+        } catch (error) {
+          console.error('Error downloading lottery data:', error)
+          alert('Fehler beim Herunterladen der Daten')
+        }
+      })
+    }
+
+    // Focus the lottery number input
+    const lotteryNumberInput = document.getElementById('lotteryNumber')
+    console.log('DOMContentLoaded: Lottery number input exists:', !!lotteryNumberInput)
+    if (lotteryNumberInput) {
+      lotteryNumberInput.focus()
+    }
+
+    // Add drag and drop handlers for JSON files
+    document.addEventListener('dragover', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      document.body.classList.add('drag-over')
+    })
+
+    document.addEventListener('dragleave', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      if (e.target === document.body) {
+        document.body.classList.remove('drag-over')
+      }
+    })
+
+    // Load saved data when page opens
+    console.log('DOMContentLoaded: Loading saved data')
+    const savedData = loadLotteryData()
+    console.log('DOMContentLoaded: Saved data exists:', !!savedData)
+    if (savedData) {
       try {
-        downloadLotteryData()
+        console.log('DOMContentLoaded: Initializing app with saved data')
+        initializeApp(savedData)
       } catch (error) {
-        console.error('Error downloading lottery data:', error)
-        alert('Fehler beim Herunterladen der Daten')
+        console.error('DOMContentLoaded: Error initializing app with saved data:', error)
+        alert(error.message)
+      }
+    }
+
+    // Format date to German format
+    function formatDate(date) {
+      const months = [
+        'Jan',
+        'Feb',
+        'Mär',
+        'Apr',
+        'Mai',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Okt',
+        'Nov',
+        'Dez',
+      ]
+      const day = String(date.getDate()).padStart(2, '0')
+      const month = months[date.getMonth()]
+      const year = date.getFullYear()
+      const hours = String(date.getHours()).padStart(2, '0')
+      const minutes = String(date.getMinutes()).padStart(2, '0')
+      return `${day} ${month} ${year} ${hours}:${minutes}`
+    }
+
+    // Add new participant input
+    function addNewParticipant(participantsContainer) {
+      // Remove the add button temporarily
+      const addButton = participantsContainer.querySelector('.add-participant')
+      addButton.remove()
+
+      // Add the new participant input
+      const newInput = createParticipantInput()
+      participantsContainer.appendChild(newInput)
+
+      // Add validation event listeners to the new input
+      const input = newInput.querySelector('input')
+      const errorElement = newInput.querySelector('.participantName-error')
+
+      // Only validate on blur
+      input.addEventListener('blur', () => {
+        validateInput(input, errorElement, true)
+        updateDrawButton()
+      })
+
+      newInput.querySelector('input').focus()
+
+      // Add the button back at the bottom
+      participantsContainer.appendChild(addButton)
+
+      updateRemoveButtons()
+      updateDrawButton()
+    }
+
+    // Remove participant input
+    function removeParticipant(event) {
+      const participantInput = event.target.closest('.participant-input')
+      const participantsContainer = participantInput.closest('.participants-container')
+      if (participantsContainer.children.length > 1) {
+        participantInput.remove()
+        updateRemoveButtons()
+        updateDrawButton()
+      }
+    }
+
+    // Remove paket
+    function removePaket(event) {
+      const paket = event.target.closest('.paket')
+      const paketsContainer = paket.closest('#pakets-container')
+      if (paketsContainer.children.length > 1) {
+        paket.remove()
+        renumberPakets()
+        updateRemoveButtons()
+        updateDrawButton()
+      }
+    }
+
+    // Add event listeners for title changes
+    document.getElementById('lotteryNumber').addEventListener('input', () => {
+      const lotteryNumber = document.getElementById('lotteryNumber').value.trim()
+      const lotteryName = document.getElementById('lotteryName').value.trim()
+      if (lotteryNumber && lotteryName) {
+        updatePageTitle(`Verlosung Spende ${lotteryNumber}: ${lotteryName}`)
+      } else {
+        updatePageTitle('Verlosung Spende')
+      }
+      updateDrawButton()
+    })
+
+    document.getElementById('lotteryName').addEventListener('input', () => {
+      const lotteryNumber = document.getElementById('lotteryNumber').value.trim()
+      const lotteryName = document.getElementById('lotteryName').value.trim()
+      if (lotteryNumber && lotteryName) {
+        updatePageTitle(`Verlosung Spende ${lotteryNumber}: ${lotteryName}`)
+      } else {
+        updatePageTitle('Verlosung Spende')
+      }
+      updateDrawButton()
+    })
+
+    // Add timestamp event listener
+    document.getElementById('timestamp').addEventListener('change', updateDrawButton)
+
+    // Handle participant input events
+    paketsContainer.addEventListener('input', (event) => {
+      if (
+        event.target.classList.contains('participantName') ||
+        event.target.classList.contains('paketTitle')
+      ) {
+        updateDrawButton()
       }
     })
-  }
 
-  // Focus the lottery number input
-  const lotteryNumberInput = document.getElementById('lotteryNumber')
-  console.log('DOMContentLoaded: Lottery number input exists:', !!lotteryNumberInput)
-  if (lotteryNumberInput) {
-    lotteryNumberInput.focus()
-  }
-
-  // Add drag and drop handlers for JSON files
-  document.addEventListener('dragover', (e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    document.body.classList.add('drag-over')
-  })
-
-  document.addEventListener('dragleave', (e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (e.target === document.body) {
-      document.body.classList.remove('drag-over')
+    // Add new participant input when Enter is pressed
+    function handleParticipantInput(event) {
+      if (event.key === 'Enter' && event.target.value.trim()) {
+        event.preventDefault()
+        const participantsContainer = event.target.closest('.participants-container')
+        addNewParticipant(participantsContainer)
+      }
     }
-  })
 
-  // Load saved data when page opens
-  console.log('DOMContentLoaded: Loading saved data')
-  const savedData = loadLotteryData()
-  console.log('DOMContentLoaded: Saved data exists:', !!savedData)
-  if (savedData) {
-    try {
-      console.log('DOMContentLoaded: Initializing app with saved data')
-      initializeApp(savedData)
-    } catch (error) {
-      console.error('DOMContentLoaded: Error initializing app with saved data:', error)
-      alert(error.message)
-    }
-  }
+    // Handle participant input events
+    paketsContainer.addEventListener('keydown', (event) => {
+      if (event.target.classList.contains('participantName')) {
+        handleParticipantInput(event)
+      }
+    })
 
-  // Format date to German format
-  function formatDate(date) {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mär',
-      'Apr',
-      'Mai',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Okt',
-      'Nov',
-      'Dez',
+    // Handle paket container clicks
+    paketsContainer.addEventListener('click', (event) => {
+      if (event.target.classList.contains('remove-paket')) {
+        removePaket(event)
+      } else if (event.target.classList.contains('remove-participant')) {
+        removeParticipant(event)
+      } else if (event.target.classList.contains('add-participant')) {
+        const participantsContainer = event.target.closest('.participants-container')
+        addNewParticipant(participantsContainer)
+      }
+    })
+
+    // Add new paket
+    addPaketButton.addEventListener('click', () => {
+      const newPaket = createPaket()
+      newPaket.dataset.paketId = paketCounter
+      newPaket.querySelector('h3').textContent = `Paket #${paketCounter}`
+      paketsContainer.appendChild(newPaket)
+      newPaket.querySelector('input').focus()
+      updateRemoveButtons()
+      updateDrawButton()
+    })
+
+    // Add event listeners for saving data
+    const saveEvents = ['input', 'change']
+    const formElements = [
+      document.getElementById('lotteryNumber'),
+      document.getElementById('lotteryName'),
+      document.getElementById('timestamp'),
+      paketsContainer,
     ]
-    const day = String(date.getDate()).padStart(2, '0')
-    const month = months[date.getMonth()]
-    const year = date.getFullYear()
-    const hours = String(date.getHours()).padStart(2, '0')
-    const minutes = String(date.getMinutes()).padStart(2, '0')
-    return `${day} ${month} ${year} ${hours}:${minutes}`
-  }
 
-  // Add new participant input
-  function addNewParticipant(participantsContainer) {
-    // Remove the add button temporarily
-    const addButton = participantsContainer.querySelector('.add-participant')
-    addButton.remove()
-
-    // Add the new participant input
-    const newInput = createParticipantInput()
-    participantsContainer.appendChild(newInput)
-
-    // Add validation event listeners to the new input
-    const input = newInput.querySelector('input')
-    const errorElement = newInput.querySelector('.participantName-error')
-
-    // Only validate on blur
-    input.addEventListener('blur', () => {
-      validateInput(input, errorElement, true)
-      updateDrawButton()
-    })
-
-    newInput.querySelector('input').focus()
-
-    // Add the button back at the bottom
-    participantsContainer.appendChild(addButton)
-
-    updateRemoveButtons()
-    updateDrawButton()
-  }
-
-  // Remove participant input
-  function removeParticipant(event) {
-    const participantInput = event.target.closest('.participant-input')
-    const participantsContainer = participantInput.closest('.participants-container')
-    if (participantsContainer.children.length > 1) {
-      participantInput.remove()
-      updateRemoveButtons()
-      updateDrawButton()
-    }
-  }
-
-  // Remove paket
-  function removePaket(event) {
-    const paket = event.target.closest('.paket')
-    const paketsContainer = paket.closest('#pakets-container')
-    if (paketsContainer.children.length > 1) {
-      paket.remove()
-      renumberPakets()
-      updateRemoveButtons()
-      updateDrawButton()
-    }
-  }
-
-  // Add event listeners for title changes
-  document.getElementById('lotteryNumber').addEventListener('input', () => {
-    const lotteryNumber = document.getElementById('lotteryNumber').value.trim()
-    const lotteryName = document.getElementById('lotteryName').value.trim()
-    if (lotteryNumber && lotteryName) {
-      updatePageTitle(`Verlosung Spende ${lotteryNumber}: ${lotteryName}`)
-    } else {
-      updatePageTitle('Verlosung Spende')
-    }
-    updateDrawButton()
-  })
-
-  document.getElementById('lotteryName').addEventListener('input', () => {
-    const lotteryNumber = document.getElementById('lotteryNumber').value.trim()
-    const lotteryName = document.getElementById('lotteryName').value.trim()
-    if (lotteryNumber && lotteryName) {
-      updatePageTitle(`Verlosung Spende ${lotteryNumber}: ${lotteryName}`)
-    } else {
-      updatePageTitle('Verlosung Spende')
-    }
-    updateDrawButton()
-  })
-
-  // Add timestamp event listener
-  document.getElementById('timestamp').addEventListener('change', updateDrawButton)
-
-  // Handle participant input events
-  paketsContainer.addEventListener('input', (event) => {
-    if (
-      event.target.classList.contains('participantName') ||
-      event.target.classList.contains('paketTitle')
-    ) {
-      updateDrawButton()
-    }
-  })
-
-  // Add new participant input when Enter is pressed
-  function handleParticipantInput(event) {
-    if (event.key === 'Enter' && event.target.value.trim()) {
-      event.preventDefault()
-      const participantsContainer = event.target.closest('.participants-container')
-      addNewParticipant(participantsContainer)
-    }
-  }
-
-  // Handle participant input events
-  paketsContainer.addEventListener('keydown', (event) => {
-    if (event.target.classList.contains('participantName')) {
-      handleParticipantInput(event)
-    }
-  })
-
-  // Handle paket container clicks
-  paketsContainer.addEventListener('click', (event) => {
-    if (event.target.classList.contains('remove-paket')) {
-      removePaket(event)
-    } else if (event.target.classList.contains('remove-participant')) {
-      removeParticipant(event)
-    } else if (event.target.classList.contains('add-participant')) {
-      const participantsContainer = event.target.closest('.participants-container')
-      addNewParticipant(participantsContainer)
-    }
-  })
-
-  // Add new paket
-  addPaketButton.addEventListener('click', () => {
-    const newPaket = createPaket()
-    newPaket.dataset.paketId = paketCounter
-    newPaket.querySelector('h3').textContent = `Paket #${paketCounter}`
-    paketsContainer.appendChild(newPaket)
-    newPaket.querySelector('input').focus()
-    updateRemoveButtons()
-    updateDrawButton()
-  })
-
-  // Add event listeners for saving data
-  const saveEvents = ['input', 'change']
-  const formElements = [
-    document.getElementById('lotteryNumber'),
-    document.getElementById('lotteryName'),
-    document.getElementById('timestamp'),
-    paketsContainer,
-  ]
-
-  formElements.forEach((element) => {
-    saveEvents.forEach((eventType) => {
-      element.addEventListener(eventType, () => {
-        saveLotteryData()
-        updateDrawButton()
+    formElements.forEach((element) => {
+      saveEvents.forEach((eventType) => {
+        element.addEventListener(eventType, () => {
+          saveLotteryData()
+          updateDrawButton()
+        })
       })
     })
-  })
 
-  // Modify draw button click handler to use makeLotteryData
-  drawButton.addEventListener('click', async () => {
-    console.log('Draw button clicked')
+    // Modify draw button click handler to use makeLotteryData
+    drawButton.addEventListener('click', async () => {
+      console.log('Draw button clicked')
 
-    if (!validateForm()) {
-      console.log('Form validation failed')
-      return
-    }
-    console.log('Form validation passed')
-
-    try {
-      const lotteryData = makeLotteryData()
-      console.log('Lottery data:', lotteryData)
-
-      // Validate data before proceeding
-      if (!lotteryData.packets.every((p) => p.title)) {
-        console.log('Packet title validation failed')
-        throw new Error('Bitte geben Sie für jedes Paket einen Titel ein.')
+      if (!validateForm()) {
+        console.log('Form validation failed')
+        return
       }
-      console.log('Packet title validation passed')
+      console.log('Form validation passed')
 
-      // Create and run lottery
-      console.log('Creating lottery instance')
-      const lottery = new Lottery(lotteryData)
-      console.log('Initializing lottery')
-      await lottery.initialize()
-      console.log('Drawing winners')
-      const results = await lottery.draw()
-      console.log('Drawing complete, results:', results)
+      try {
+        const lotteryData = makeLotteryData()
+        console.log('Lottery data:', lotteryData)
 
-      // Store results in localStorage
-      console.log('Storing results in localStorage')
-      localStorage.setItem('lotteryData', JSON.stringify(results))
-
-      // Reinitialize the app with the results to make it read-only
-      console.log('Reinitializing app with results')
-      initializeApp(results)
-    } catch (error) {
-      console.error('Error in draw process:', error)
-      document.getElementById('results').innerHTML = `
-        <div class="error-message">
-          <h3>Fehler</h3>
-          <p>${error.message}</p>
-        </div>
-      `
-    }
-  })
-
-  // Initialize remove buttons visibility and button state only if not in read-only mode
-  const isReadOnly = Array.isArray(savedData?.drawings)
-  console.log('DOMContentLoaded: Is read-only mode:', isReadOnly)
-  if (!isReadOnly) {
-    console.log('DOMContentLoaded: Initializing remove buttons (not in read-only mode)')
-    updateRemoveButtons()
-  }
-  updateDrawButton()
-
-  // Add validation event listeners for all inputs
-  const inputs = form.querySelectorAll('input')
-
-  inputs.forEach((input) => {
-    // Create error element if it doesn't exist
-    let errorElement =
-      document.getElementById(`${input.id}Error`) ||
-      input.closest('.paket')?.querySelector('.paketTitle-error') ||
-      input.closest('.participants-container')?.querySelector('.participantName-error')
-
-    if (!errorElement) {
-      const formGroup =
-        input.closest('.form-group') ||
-        input.closest('.paket') ||
-        input.closest('.participants-container')
-      if (formGroup) {
-        errorElement = document.createElement('div')
-        if (input.id) {
-          errorElement.id = `${input.id}Error`
-        } else if (input.classList.contains('paketTitle')) {
-          errorElement.className = 'paketTitle-error'
-        } else if (input.classList.contains('participantName')) {
-          errorElement.className = 'participantName-error'
+        // Validate data before proceeding
+        if (!lotteryData.packets.every((p) => p.title)) {
+          console.log('Packet title validation failed')
+          throw new Error('Bitte geben Sie für jedes Paket einen Titel ein.')
         }
-        formGroup.appendChild(errorElement)
-      }
-    }
+        console.log('Packet title validation passed')
 
-    // Validate on blur - this should always run when leaving a field
-    input.addEventListener('blur', () => {
-      // For number inputs, ensure we validate the cleaned value
+        // Create and run lottery
+        console.log('Creating lottery instance')
+        const lottery = new Lottery(lotteryData)
+        console.log('Initializing lottery')
+        await lottery.initialize()
+        console.log('Drawing winners')
+        const results = await lottery.draw()
+        console.log('Drawing complete, results:', results)
+
+        // Store results in localStorage
+        console.log('Storing results in localStorage')
+        localStorage.setItem('lotteryData', JSON.stringify(results))
+
+        // Reinitialize the app with the results to make it read-only
+        console.log('Reinitializing app with results')
+        initializeApp(results)
+      } catch (error) {
+        console.error('Error in draw process:', error)
+        document.getElementById('results').innerHTML = `
+          <div class="error-message">
+            <h3>Fehler</h3>
+            <p>${error.message}</p>
+          </div>
+        `
+      }
+    })
+
+    // Initialize remove buttons visibility and button state only if not in read-only mode
+    const isReadOnly = Array.isArray(savedData?.drawings)
+    console.log('DOMContentLoaded: Is read-only mode:', isReadOnly)
+    if (!isReadOnly) {
+      console.log('DOMContentLoaded: Initializing remove buttons (not in read-only mode)')
+      updateRemoveButtons()
+    }
+    updateDrawButton()
+
+    // Add validation event listeners for all inputs
+    const inputs = form.querySelectorAll('input')
+
+    inputs.forEach((input) => {
+      console.log(`[DOMContentLoaded] Setting up validation for input:`, {
+        id: input.id,
+        type: input.type,
+        required: input.required,
+      })
+
+      // Create error element if it doesn't exist
+      let errorElement =
+        document.getElementById(`${input.id}Error`) ||
+        input.closest('.paket')?.querySelector('.paketTitle-error') ||
+        input.closest('.participants-container')?.querySelector('.participantName-error')
+
+      if (!errorElement) {
+        const formGroup =
+          input.closest('.form-group') ||
+          input.closest('.paket') ||
+          input.closest('.participants-container')
+        if (formGroup) {
+          errorElement = document.createElement('div')
+          if (input.id) {
+            errorElement.id = `${input.id}Error`
+          } else if (input.classList.contains('paketTitle')) {
+            errorElement.className = 'paketTitle-error'
+          } else if (input.classList.contains('participantName')) {
+            errorElement.className = 'participantName-error'
+          }
+          formGroup.appendChild(errorElement)
+        }
+      }
+
+      // Validate on blur - this should always run when leaving a field
+      input.addEventListener('blur', (e) => {
+        // Skip validation if we're initializing
+        if (isInitializing) {
+          console.log(
+            `[blur] Skipping validation during initialization for ${input.id || input.className}`,
+          )
+          return
+        }
+
+        console.log(`[blur] Event fired for ${input.id || input.className}:`, {
+          value: input.value,
+          type: input.type,
+          required: input.required,
+        })
+
+        // For number inputs, ensure we validate the cleaned value
+        if (input.type === 'number') {
+          const oldValue = input.value
+          input.value = input.value.replace(/[^0-9]/g, '')
+          console.log(`[blur] Cleaned number input:`, {
+            oldValue,
+            newValue: input.value,
+          })
+        }
+        // Show validation error when leaving the field
+        validateInput(input, errorElement, true)
+        updateDrawButton()
+      })
+
+      // For number inputs, handle input validation differently
       if (input.type === 'number') {
-        input.value = input.value.replace(/[^0-9]/g, '')
+        input.addEventListener('input', (e) => {
+          console.log(`[input] Number input event for ${input.id}:`, {
+            originalValue: e.target.value,
+            hasFocus: document.activeElement === input,
+          })
+
+          // Only remove non-digit characters from the new input
+          const newValue = e.target.value.replace(/[^0-9]/g, '')
+          // Only update if the value actually changed (to avoid cursor jumping)
+          if (newValue !== e.target.value) {
+            console.log(`[input] Updating number input value:`, {
+              oldValue: e.target.value,
+              newValue,
+            })
+            e.target.value = newValue
+          }
+
+          // Update title
+          const lotteryNumber = e.target.value.trim()
+          const lotteryName = document.getElementById('lotteryName').value.trim()
+          if (lotteryNumber && lotteryName) {
+            updatePageTitle(`Verlosung Spende ${lotteryNumber}: ${lotteryName}`)
+          } else {
+            updatePageTitle('Verlosung Spende')
+          }
+          // Update button state without showing errors
+          updateDrawButton()
+        })
+      } else {
+        // For non-number inputs, only update button state on input
+        input.addEventListener('input', () => {
+          // Update button state without showing errors
+          updateDrawButton()
+        })
       }
-      // Show validation error when leaving the field
-      validateInput(input, errorElement, true)
-      updateDrawButton()
     })
 
-    // For number inputs, handle input validation differently
-    if (input.type === 'number') {
-      input.addEventListener('input', (e) => {
-        // Only remove non-digit characters from the new input
-        const newValue = e.target.value.replace(/[^0-9]/g, '')
-        // Only update if the value actually changed (to avoid cursor jumping)
-        if (newValue !== e.target.value) {
-          e.target.value = newValue
-        }
-
-        // Update title
-        const lotteryNumber = e.target.value.trim()
-        const lotteryName = document.getElementById('lotteryName').value.trim()
-        if (lotteryNumber && lotteryName) {
-          updatePageTitle(`Verlosung Spende ${lotteryNumber}: ${lotteryName}`)
-        } else {
-          updatePageTitle('Verlosung Spende')
-        }
-        // Update button state without showing errors
-        updateDrawButton()
-      })
-    } else {
-      // For non-number inputs, only update button state on input
-      input.addEventListener('input', () => {
-        // Update button state without showing errors
-        updateDrawButton()
-      })
-    }
-  })
-
-  console.log('DOMContentLoaded: Completed initialization')
+    console.log('DOMContentLoaded: Completed initialization')
+  } finally {
+    isInitializing = false // Reset flag after initialization
+    // Only update button state after initialization is complete
+    updateDrawButton()
+  }
 })
 
 // Function to download lottery data
