@@ -24,14 +24,12 @@ export class Lottery {
   }
 
   async initialize() {
-    console.log('Initializing lottery with timestamp:', this.timestamp)
     // Parse ISO timestamp and convert to UTC
     const dt = new Date(this.timestamp)
     if (isNaN(dt.getTime())) {
       throw new Error('Invalid timestamp format. Use ISO-8601 with timezone offset')
     }
     const timestampStr = Math.floor(dt.getTime() / 1000).toString()
-    console.log('Timestamp string:', timestampStr)
 
     // Create hash using Web Crypto API (SHA-512)
     const encoder = new TextEncoder()
@@ -58,7 +56,6 @@ export class Lottery {
     const hashBuffer = await crypto.subtle.digest('SHA-512', hashData)
     const hashArray = Array.from(new Uint8Array(hashBuffer))
     this.seed = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
-    console.log('Generated seed:', this.seed)
 
     // Create a single RNG instance
     this.rnd = new SeededRandom(this.seed)
@@ -71,9 +68,6 @@ export class Lottery {
       throw new Error('Random number generator not initialized')
     }
 
-    console.log('Drawing for packet:', text)
-    console.log('Available names:', names)
-
     names.sort()
     const counts = {}
     for (const name of names) {
@@ -81,7 +75,6 @@ export class Lottery {
     }
 
     const winner = this.rnd.choice(names)
-    console.log('Selected winner:', winner)
 
     return {
       text,

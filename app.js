@@ -8,9 +8,7 @@ let isInitializing = false
 
 // Function to parse participant input
 function parseParticipantsInput(input) {
-  console.log('parseParticipantsInput called with:', input)
   const lines = input.split('\n').filter(line => line.trim())
-  console.log('Filtered lines:', lines)
   const participants = []
   const errors = []
 
@@ -20,7 +18,6 @@ function parseParticipantsInput(input) {
 
     // Split by spaces, commas, or semicolons
     const parts = trimmedLine.split(/[\s,;]+/).filter(part => part.trim())
-    console.log(`Line ${lineIndex + 1} parts:`, parts)
 
     if (parts.length < 2) {
       errors.push(`Zeile ${lineIndex + 1}: Ungültiges Format. Erwartet: <nickname> <paket1> [<paket2> ...]`)
@@ -47,6 +44,13 @@ function parseParticipantsInput(input) {
       validPacketNumbers.push(num)
     }
 
+    // Check for duplicate packet numbers within this participant
+    const uniquePacketNumbers = [...new Set(validPacketNumbers)]
+    if (uniquePacketNumbers.length !== validPacketNumbers.length) {
+      errors.push(`Zeile ${lineIndex + 1}: Teilnehmer "${nickname}" hat doppelte Paketnummern. Jeder Teilnehmer kann nur ein Ticket pro Paket kaufen.`)
+      return
+    }
+
     // Check for duplicate nicknames
     if (participants.some(p => p.name === nickname)) {
       errors.push(`Zeile ${lineIndex + 1}: Nickname "${nickname}" ist bereits vorhanden.`)
@@ -59,13 +63,11 @@ function parseParticipantsInput(input) {
     })
   })
 
-  console.log('parseParticipantsInput result:', { participants, errors })
   return { participants, errors }
 }
 
 // Function to validate packet numbers against existing packets
 function validatePacketNumbers(participants, packetCount) {
-  console.log('validatePacketNumbers called with:', { participants, packetCount })
   const errors = []
 
   participants.forEach((participant, participantIndex) => {
@@ -76,7 +78,6 @@ function validatePacketNumbers(participants, packetCount) {
     })
   })
 
-  console.log('validatePacketNumbers result:', errors)
   return errors
 }
 
@@ -192,8 +193,6 @@ function createFilename(title) {
 
 // Function to reset lottery data to edit mode
 function resetToEditMode() {
-  console.log('resetToEditMode: Starting...')
-
   // Load current data from localStorage
   const savedData = loadLotteryData()
   if (!savedData) {
@@ -209,11 +208,9 @@ function resetToEditMode() {
   }
 
   // Save the modified data back to localStorage
-  console.log('resetToEditMode: Saving modified data to localStorage')
   localStorage.setItem('lotteryData', JSON.stringify(editData))
 
   // Reinitialize the app with the modified data
-  console.log('resetToEditMode: Reinitializing app')
   initializeApp(editData)
 }
 
@@ -437,15 +434,12 @@ function renumberPakets() {
 
 // Function to initialize the application with lottery data
 function initializeApp(data) {
-  console.log('initializeApp: Starting with data:', data)
   if (!data) {
-    console.log('initializeApp: No data provided')
     return
   }
 
   try {
     // Validate the data structure
-    console.log('initializeApp: Validating data structure')
     const validationErrors = []
     if (!data.title) {
       validationErrors.push('Titel fehlt')
@@ -505,41 +499,31 @@ function initializeApp(data) {
     }
 
     // Save to localStorage
-    console.log('initializeApp: Saving to localStorage')
     localStorage.setItem('lotteryData', JSON.stringify(data))
 
     // Clear existing form
     const paketsContainer = document.getElementById('pakets-container')
-    console.log('initializeApp: Pakets container exists:', !!paketsContainer)
     if (paketsContainer) {
-      console.log('initializeApp: Clearing pakets container')
       paketsContainer.innerHTML = ''
     }
 
     // Check if this is a results file
     const isResultsFile = Array.isArray(data.drawings)
-    console.log('initializeApp: Is results file:', isResultsFile)
 
     // Populate the form
-    console.log('initializeApp: Populating form')
     populateFormWithData(data)
 
     // If this is a results file, display the results
     if (isResultsFile) {
-      console.log('initializeApp: Displaying results')
       displayResults(data)
     }
 
     // Update UI state - only update buttons if not in read-only mode
-    console.log('initializeApp: Updating UI state')
     renumberPakets()
     if (!isResultsFile) {
-      console.log('initializeApp: Updating remove buttons (not in read-only mode)')
       updateRemoveButtons()
     }
     updateDrawButton()
-
-    console.log('initializeApp: Completed successfully')
   } catch (error) {
     console.error('initializeApp: Error during initialization:', error)
     throw error
@@ -561,53 +545,36 @@ function loadLotteryData() {
 
 // Function to make the form read-only
 function makeFormReadOnly() {
-  console.log('makeFormReadOnly: Starting...')
-
   // Hide the entire form
   const form = document.getElementById('lotteryForm')
-  console.log('makeFormReadOnly: Form exists:', !!form)
   if (form && form.style) {
-    console.log('makeFormReadOnly: Hiding form')
     form.style.display = 'none'
   }
 
   // Show the results container
   const resultsContainer = document.getElementById('results')
-  console.log('makeFormReadOnly: Results container exists:', !!resultsContainer)
   if (resultsContainer && resultsContainer.style) {
-    console.log('makeFormReadOnly: Showing results container')
     resultsContainer.style.display = 'block'
   }
-
-  console.log('makeFormReadOnly: Completed')
 }
 
 // Function to make the form editable
 function makeFormEditable() {
-  console.log('makeFormEditable: Starting...')
-
   // Show the form
   const form = document.getElementById('lotteryForm')
-  console.log('makeFormEditable: Form exists:', !!form)
   if (form && form.style) {
-    console.log('makeFormEditable: Showing form')
     form.style.display = 'block'
   }
 
   // Hide the results container
   const resultsContainer = document.getElementById('results')
-  console.log('makeFormEditable: Results container exists:', !!resultsContainer)
   if (resultsContainer && resultsContainer.style) {
-    console.log('makeFormEditable: Hiding results container')
     resultsContainer.style.display = 'none'
   }
-
-  console.log('makeFormEditable: Completed')
 }
 
 // Add a function to clear all validation messages
 function clearAllValidationMessages() {
-  console.log('[clearAllValidationMessages] Clearing all validation messages')
   document.querySelectorAll('.validation-message').forEach((element) => {
     element.style.display = 'none'
     element.classList.remove('show')
@@ -616,43 +583,28 @@ function clearAllValidationMessages() {
 }
 
 function populateFormWithData(data) {
-  console.log('[populateFormWithData] Starting with data:', {
-    title: data.title,
-    hasDrawings: Array.isArray(data.drawings),
-    lotteryNumber: data.title.match(/^Verlosung Spende\s+(\d+):\s+(.+)$/)?.[1],
-  })
-
   isInitializing = true // Set flag before populating form
   clearAllValidationMessages() // Clear any existing validation messages
 
   try {
     // Check if this is a results file (has drawings)
     const isResultsFile = Array.isArray(data.drawings)
-    console.log('populateFormWithData: Is results file:', isResultsFile)
 
     // Update page title with saved title
-    console.log('populateFormWithData: Updating page title')
     updatePageTitle(data.title)
 
     if (isResultsFile) {
       // For results files, just display the results
-      console.log('populateFormWithData: Displaying results')
       displayResults(data)
       makeFormReadOnly()
     } else {
       // For normal lottery data, populate the form
-      console.log('populateFormWithData: Populating form')
       makeFormEditable()
 
       // Extract lottery number and name from title
       const titleMatch = data.title.match(/^Verlosung Spende\s+(\d+):\s+(.+)$/)
       if (titleMatch) {
         const [, number, name] = titleMatch
-        console.log('[populateFormWithData] Setting lottery number:', {
-          number,
-          name,
-          elementExists: !!document.getElementById('lotteryNumber'),
-        })
         document.getElementById('lotteryNumber').value = number
         document.getElementById('lotteryName').value = name
       } else {
@@ -682,7 +634,6 @@ function populateFormWithData(data) {
 
       // Clear existing pakets
       const paketsContainer = document.getElementById('pakets-container')
-      console.log('populateFormWithData: Pakets container exists:', !!paketsContainer)
       paketsContainer.innerHTML = ''
 
       // Add saved pakets
@@ -719,7 +670,6 @@ function populateFormWithData(data) {
       }
 
       // Update UI state for normal lottery data
-      console.log('populateFormWithData: Updating UI state')
       updateRemoveButtons()
       updateDrawButton()
     }
@@ -729,7 +679,6 @@ function populateFormWithData(data) {
     updateDrawButton()
   }
 
-  console.log('populateFormWithData: Completed')
 }
 
 // Update remove buttons visibility
@@ -746,7 +695,6 @@ function updateRemoveButtons() {
 function updateDrawButton() {
   // Skip button updates during initialization
   if (isInitializing) {
-    console.log('[updateDrawButton] Skipping during initialization')
     return
   }
 
@@ -761,15 +709,7 @@ function updateDrawButton() {
   // Local function to set invalid and log reason
   function setInvalid(reason) {
     isValid = false
-    console.log('Setting invalid:', reason)
   }
-
-  // Debug: print values of all required inputs
-  inputs.forEach((input) => {
-    console.log(
-      `Field ${input.id || input.className}: value='${input.value}', type='${input.type}'`,
-    )
-  })
 
   // Validate all required inputs
   inputs.forEach((input) => {
@@ -778,7 +718,6 @@ function updateDrawButton() {
 
     // Pass false for showError to prevent showing errors during button state updates
     const valid = validateInput(input, errorElement, false)
-    console.log(`Validating ${input.id || input.className}:`, valid)
     if (!valid) {
       setInvalid(`Required input validation failed for ${input.id || input.className}`)
     }
@@ -789,7 +728,6 @@ function updateDrawButton() {
     const errorElement = input.closest('.paket').querySelector('.paketTitle-error')
     // Pass false for showError to prevent showing errors during button state updates
     const valid = validateInput(input, errorElement, false)
-    console.log(`Validating paket title:`, valid)
     if (!valid) {
       setInvalid(`Paket title validation failed`)
     }
@@ -797,7 +735,6 @@ function updateDrawButton() {
 
   // Check if we have at least one paket
   const pakets = document.querySelectorAll('.paket')
-  console.log('Number of pakets:', pakets.length)
   if (pakets.length === 0) {
     setInvalid('No pakets found')
   }
@@ -838,7 +775,6 @@ function updateDrawButton() {
 
   // Update button state
   drawButton.disabled = !isValid
-  console.log('Draw button disabled:', drawButton.disabled, 'isValid:', isValid)
 }
 
 // Function to update participants overview
@@ -940,9 +876,6 @@ const validationMessages = {
 function validateInput(input, errorElement, showError = true) {
   // Skip validation during initialization unless explicitly requested
   if (isInitializing && !showError) {
-    console.log(
-      `[validateInput] Skipping validation during initialization for ${input.id || input.className}`,
-    )
     // Clear error message during initialization
     if (errorElement) {
       errorElement.style.display = 'none'
@@ -951,15 +884,6 @@ function validateInput(input, errorElement, showError = true) {
     }
     return true
   }
-
-  console.log(`[validateInput] Starting validation for ${input.id || input.className}:`, {
-    value: input.value,
-    showError,
-    isRequired: input.required,
-    hasFocus: document.activeElement === input,
-    type: input.type,
-    isInitializing,
-  })
 
   const value = input.value.trim()
   let isValid = true
@@ -971,35 +895,16 @@ function validateInput(input, errorElement, showError = true) {
 
   // Check required
   if (input.required && !value) {
-    console.log(`[validateInput] Required field validation failed for ${validationKey}:`, {
-      value,
-      hasFocus: document.activeElement === input,
-      showError,
-    })
     isValid = false
     errorMessage = validationMessages[validationKey]?.required || 'Dieses Feld ist erforderlich.'
-  } else if (input.required && value) {
-    console.log(`[validateInput] Required field validation passed for ${validationKey}:`, {
-      value,
-      required: input.required,
-      hasValue: !!value
-    })
   }
 
   // Check min/max length for text fields only
   if (isValid && value && (input.type === 'text' || input.type === 'textarea')) {
-    console.log(`[validateInput] Checking min/max length for ${validationKey}:`, {
-      value: value.length,
-      minLength: input.minLength,
-      maxLength: input.maxLength,
-      type: input.type
-    })
     if (input.minLength && input.minLength > 0 && value.length < input.minLength) {
-      console.log(`[validateInput] Min length validation failed for ${validationKey}`)
       isValid = false
       errorMessage = validationMessages[validationKey]?.minLength
     } else if (input.maxLength && input.maxLength > 0 && value.length > input.maxLength) {
-      console.log(`[validateInput] Max length validation failed for ${validationKey}`)
       isValid = false
       errorMessage = validationMessages[validationKey]?.maxLength
     }
@@ -1007,13 +912,8 @@ function validateInput(input, errorElement, showError = true) {
 
   // Check pattern for text fields only
   if (isValid && value && input.pattern && (input.type === 'text' || input.type === 'textarea')) {
-    console.log(`[validateInput] Checking pattern for ${validationKey}:`, {
-      pattern: input.pattern,
-      value: value
-    })
     const pattern = new RegExp(input.pattern)
     if (!pattern.test(value)) {
-      console.log(`[validateInput] Pattern validation failed for ${validationKey}`)
       isValid = false
       errorMessage = validationMessages[validationKey]?.pattern
     }
@@ -1048,14 +948,6 @@ function validateInput(input, errorElement, showError = true) {
 
   // Update error message display only if showError is true and we're not initializing
   if (errorElement && showError && !isInitializing) {
-    console.log(`[validateInput] Updating error display for ${validationKey}:`, {
-      isValid,
-      showError,
-      hasFocus: document.activeElement === input,
-      errorMessage,
-      isInitializing,
-    })
-
     if (!isValid) {
       errorElement.textContent = errorMessage
       errorElement.style.display = 'block'
@@ -1072,7 +964,6 @@ function validateInput(input, errorElement, showError = true) {
 
 // Function to validate all inputs in a form
 function validateForm() {
-  console.log('Starting form validation')
   const form = document.getElementById('lotteryForm')
   const inputs = form.querySelectorAll('input[required], textarea[required]')
   let isValid = true
@@ -1083,7 +974,6 @@ function validateForm() {
 
     // Pass false for showError to prevent showing errors during form validation
     const inputValid = validateInput(input, errorElement, false)
-    console.log(`Validating ${input.id || input.className}:`, inputValid)
     if (!inputValid) {
       isValid = false
     }
@@ -1094,7 +984,6 @@ function validateForm() {
     const errorElement = input.closest('.paket').querySelector('.paketTitle-error')
     // Pass false for showError to prevent showing errors during form validation
     const inputValid = validateInput(input, errorElement, false)
-    console.log(`Validating paket title:`, inputValid)
     if (!inputValid) {
       isValid = false
     }
@@ -1113,7 +1002,6 @@ function validateForm() {
     }
   }
 
-  console.log('Form validation complete:', isValid)
   return isValid
 }
 
@@ -1133,7 +1021,6 @@ document.addEventListener('drop', (e) => {
   reader.onload = (event) => {
     try {
       const data = JSON.parse(event.target.result)
-      console.log('Loaded JSON data:', data)
       initializeApp(data)
     } catch (error) {
       console.error('Error loading JSON:', error)
@@ -1155,31 +1042,22 @@ document.addEventListener('DOMContentLoaded', () => {
   isInitializing = true // Set flag at start of initialization
 
   try {
-    console.log('DOMContentLoaded: Starting initialization')
-
     const form = document.getElementById('lotteryForm')
-    console.log('DOMContentLoaded: Form exists:', !!form)
 
     const paketsContainer = document.getElementById('pakets-container')
-    console.log('DOMContentLoaded: Pakets container exists:', !!paketsContainer)
 
     const addPaketButton = document.getElementById('addPaket')
-    console.log('DOMContentLoaded: Add paket button exists:', !!addPaketButton)
 
     const drawButton = document.getElementById('drawButton')
-    console.log('DOMContentLoaded: Draw button exists:', !!drawButton)
 
     // Initially hide the results container
     const resultsContainer = document.getElementById('results')
-    console.log('DOMContentLoaded: Results container exists:', !!resultsContainer)
     if (resultsContainer && resultsContainer.style) {
-      console.log('DOMContentLoaded: Initially hiding results container')
       resultsContainer.style.display = 'none'
     }
 
     // Add download button event listener
     const downloadButton = document.getElementById('downloadLottery')
-    console.log('DOMContentLoaded: Download button exists:', !!downloadButton)
     if (downloadButton) {
       downloadButton.addEventListener('click', () => {
         try {
@@ -1193,7 +1071,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Focus the lottery number input
     const lotteryNumberInput = document.getElementById('lotteryNumber')
-    console.log('DOMContentLoaded: Lottery number input exists:', !!lotteryNumberInput)
     if (lotteryNumberInput) {
       lotteryNumberInput.focus()
     }
@@ -1214,12 +1091,9 @@ document.addEventListener('DOMContentLoaded', () => {
     })
 
     // Load saved data when page opens
-    console.log('DOMContentLoaded: Loading saved data')
     const savedData = loadLotteryData()
-    console.log('DOMContentLoaded: Saved data exists:', !!savedData)
     if (savedData) {
       try {
-        console.log('DOMContentLoaded: Initializing app with saved data')
         initializeApp(savedData)
       } catch (error) {
         console.error('DOMContentLoaded: Error initializing app with saved data:', error)
@@ -1350,46 +1224,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Modify draw button click handler to use makeLotteryData
     drawButton.addEventListener('click', async () => {
-      console.log('Draw button clicked')
-
       if (!validateForm()) {
-        console.log('Form validation failed')
         return
       }
-      console.log('Form validation passed')
 
       try {
         const { data: lotteryData, errors } = makeLotteryData()
-        console.log('Lottery data:', lotteryData)
-        console.log('Validation errors:', errors)
 
         if (errors && errors.length > 0) {
-          console.log('Validation errors found')
           throw new Error(`Validierungsfehler:\n${errors.join('\n')}`)
         }
 
         // Validate data before proceeding
         if (!lotteryData.packets.every((p) => p.title)) {
-          console.log('Packet title validation failed')
           throw new Error('Bitte gib für jedes Paket einen Titel ein.')
         }
-        console.log('Packet title validation passed')
 
         // Create and run lottery
-        console.log('Creating lottery instance')
         const lottery = new Lottery(lotteryData)
-        console.log('Initializing lottery')
         await lottery.initialize()
-        console.log('Drawing winners')
         const results = await lottery.draw()
-        console.log('Drawing complete, results:', results)
 
         // Store results in localStorage
-        console.log('Storing results in localStorage')
         localStorage.setItem('lotteryData', JSON.stringify(results))
 
         // Reinitialize the app with the results to make it read-only
-        console.log('Reinitializing app with results')
         initializeApp(results)
       } catch (error) {
         console.error('Error in draw process:', error)
@@ -1404,9 +1263,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize remove buttons visibility and button state only if not in read-only mode
     const isReadOnly = Array.isArray(savedData?.drawings)
-    console.log('DOMContentLoaded: Is read-only mode:', isReadOnly)
     if (!isReadOnly) {
-      console.log('DOMContentLoaded: Initializing remove buttons (not in read-only mode)')
       updateRemoveButtons()
     }
     updateDrawButton()
@@ -1415,11 +1272,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const inputs = form.querySelectorAll('input, textarea')
 
     inputs.forEach((input) => {
-      console.log(`[DOMContentLoaded] Setting up validation for input:`, {
-        id: input.id,
-        type: input.type,
-        required: input.required,
-      })
 
       // Create error element if it doesn't exist
       let errorElement =
@@ -1445,26 +1297,12 @@ document.addEventListener('DOMContentLoaded', () => {
       input.addEventListener('blur', (e) => {
         // Skip validation if we're initializing
         if (isInitializing) {
-          console.log(
-            `[blur] Skipping validation during initialization for ${input.id || input.className}`,
-          )
           return
         }
 
-        console.log(`[blur] Event fired for ${input.id || input.className}:`, {
-          value: input.value,
-          type: input.type,
-          required: input.required,
-        })
-
         // For number inputs, ensure we validate the cleaned value
         if (input.type === 'number') {
-          const oldValue = input.value
           input.value = input.value.replace(/[^0-9]/g, '')
-          console.log(`[blur] Cleaned number input:`, {
-            oldValue,
-            newValue: input.value,
-          })
         }
         // Show validation error when leaving the field
         validateInput(input, errorElement, true)
@@ -1474,19 +1312,10 @@ document.addEventListener('DOMContentLoaded', () => {
       // For number inputs, handle input validation differently
       if (input.type === 'number') {
         input.addEventListener('input', (e) => {
-          console.log(`[input] Number input event for ${input.id}:`, {
-            originalValue: e.target.value,
-            hasFocus: document.activeElement === input,
-          })
-
           // Only remove non-digit characters from the new input
           const newValue = e.target.value.replace(/[^0-9]/g, '')
           // Only update if the value actually changed (to avoid cursor jumping)
           if (newValue !== e.target.value) {
-            console.log(`[input] Updating number input value:`, {
-              oldValue: e.target.value,
-              newValue,
-            })
             e.target.value = newValue
           }
 
@@ -1510,7 +1339,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     })
 
-    console.log('DOMContentLoaded: Completed initialization')
+
   } finally {
     isInitializing = false // Reset flag after initialization
     // Only update button state after initialization is complete
