@@ -41,20 +41,24 @@
                         </div>
                         <button type="button" class="remove-paket" style="display: none;">×</button>
                     </div>
-                    <div class="participants-container">
-                        <div class="participant-input">
-                            <div class="input-wrapper">
-                                <input type="text" placeholder="Teilnehmer Nickname" class="participantName" minlength="2" maxlength="50" pattern="[a-zA-Z0-9_-]+">
-                                <div class="validation-message participantName-error"></div>
-                            </div>
-                            <button type="button" class="remove-participant">×</button>
-                        </div>
-                        <button type="button" class="add-participant">+ Neuer Teilnehmer</button>
-                    </div>
                 </div>
             </div>
 
             <button type="button" id="addPaket">+ Neues Paket</button>
+
+            <div class="form-group">
+                <label for="participantsInput">Teilnehmer (ein Nickname pro Zeile):</label>
+                <div class="input-wrapper">
+                    <textarea id="participantsInput" placeholder="Format: &lt;nickname&gt; &lt;paket1&gt; [&lt;paket2&gt; ...]&#10;Beispiel:&#10;alice 1 2&#10;bob 1&#10;charlie 2 3" rows="8" required></textarea>
+                    <div class="validation-message" id="participantsInputError"></div>
+                </div>
+            </div>
+
+            <div id="participantsOverview" class="participants-overview" style="display: none;">
+                <h3>Übersicht der Teilnehmer:</h3>
+                <div id="overviewContent"></div>
+            </div>
+
             <div class="action-buttons">
                 <button type="button" id="drawButton" disabled>Verlosung durchführen</button>
                 <button type="button" id="downloadLottery">JSON herunterladen</button>

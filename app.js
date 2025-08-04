@@ -6,6 +6,124 @@ let paketCounter = 1
 // Add a flag to track if we're currently initializing/populating the form
 let isInitializing = false
 
+// Function to parse participant input
+function parseParticipantsInput(input) {
+  console.log('parseParticipantsInput called with:', input)
+  const lines = input.split('\n').filter(line => line.trim())
+  console.log('Filtered lines:', lines)
+  const participants = []
+  const errors = []
+
+  lines.forEach((line, lineIndex) => {
+    const trimmedLine = line.trim()
+    if (!trimmedLine) return
+
+    // Split by spaces, commas, or semicolons
+    const parts = trimmedLine.split(/[\s,;]+/).filter(part => part.trim())
+    console.log(`Line ${lineIndex + 1} parts:`, parts)
+
+    if (parts.length < 2) {
+      errors.push(`Zeile ${lineIndex + 1}: Ungültiges Format. Erwartet: <nickname> <paket1> [<paket2> ...]`)
+      return
+    }
+
+    const nickname = parts[0].trim()
+    const packetNumbers = parts.slice(1).map(part => part.trim()).filter(part => part)
+
+    // Validate nickname
+    if (!nickname.match(/^[a-zA-Z0-9_-]+$/)) {
+      errors.push(`Zeile ${lineIndex + 1}: Ungültiger Nickname "${nickname}". Nur Buchstaben, Zahlen, Unterstriche und Bindestriche erlaubt.`)
+      return
+    }
+
+    // Validate packet numbers
+    const validPacketNumbers = []
+    for (const packetNum of packetNumbers) {
+      const num = parseInt(packetNum)
+      if (isNaN(num) || num < 1) {
+        errors.push(`Zeile ${lineIndex + 1}: Ungültige Paketnummer "${packetNum}". Muss eine positive Zahl sein.`)
+        return
+      }
+      validPacketNumbers.push(num)
+    }
+
+    // Check for duplicate nicknames
+    if (participants.some(p => p.name === nickname)) {
+      errors.push(`Zeile ${lineIndex + 1}: Nickname "${nickname}" ist bereits vorhanden.`)
+      return
+    }
+
+    participants.push({
+      name: nickname,
+      packets: validPacketNumbers
+    })
+  })
+
+  console.log('parseParticipantsInput result:', { participants, errors })
+  return { participants, errors }
+}
+
+// Function to validate packet numbers against existing packets
+function validatePacketNumbers(participants, packetCount) {
+  console.log('validatePacketNumbers called with:', { participants, packetCount })
+  const errors = []
+
+  participants.forEach((participant, participantIndex) => {
+    participant.packets.forEach(packetNum => {
+      if (packetNum > packetCount) {
+        errors.push(`${participant.name}: Paket ${packetNum} existiert nicht (maximal ${packetCount} Pakete verfügbar).`)
+      }
+    })
+  })
+
+  console.log('validatePacketNumbers result:', errors)
+  return errors
+}
+
+// Function to generate participants overview HTML
+function generateParticipantsOverview(participants, packets, validationErrors) {
+  if (participants.length === 0) {
+    return '<p>Keine Teilnehmer eingegeben.</p>'
+  }
+
+  const overviewHTML = participants.map(participant => {
+    const packetTitles = participant.packets.map(packetNum => {
+      const packet = packets[packetNum - 1]
+      return packet ? packet.title : `Paket ${packetNum}`
+    }).join(', ')
+
+    const hasError = validationErrors.some(error => error.includes(participant.name))
+    const errorClass = hasError ? 'error' : ''
+
+    return `
+      <div class="participant-entry ${errorClass}">
+        <span class="participant-name">@${participant.name}</span>
+        <span class="participant-packets">→ ${packetTitles}</span>
+      </div>
+    `
+  }).join('')
+
+  return overviewHTML
+}
+
+// Function to convert participants data to the format expected by the lottery
+function convertParticipantsToLotteryFormat(participants, packets) {
+  const packetParticipants = packets.map(() => [])
+
+  participants.forEach(participant => {
+    participant.packets.forEach(packetNum => {
+      if (packetNum <= packets.length) {
+        packetParticipants[packetNum - 1].push(participant.name)
+      }
+    })
+  })
+
+  return packets.map((packet, index) => ({
+    title: packet.title,
+    participants: packetParticipants[index].map(name => ({ name, tickets: 1 }))
+  }))
+}
+
 function shortenSeed(seed) {
   if (seed.length <= 16) return seed
   return `${seed.substring(0, 8)}...${seed.substring(seed.length - 8)}`
@@ -28,7 +146,7 @@ function getResultsHTML(results) {
                 <div class="results-meta">
                     <p><strong>Zeitpunkt:</strong> ${results.timestamp} (${epochTime})</p>
                     <p>
-                        <strong>Seed:</strong> 
+                        <strong>Seed:</strong>
                         <code class="copyable-seed" title="Klicken zum Kopieren des vollständigen Seeds" data-seed="${results.rngSeed}">
                             ${shortSeed}
                         </code>
@@ -268,24 +386,28 @@ function makeLotteryData() {
     }
   }
 
-  const pakets = Array.from(document.querySelectorAll('.paket')).map((paket) => {
-    const participants = Array.from(paket.querySelectorAll('.participantName'))
-      .map((input) => ({
-        name: input.value.trim(),
-        tickets: 1,
-      }))
-      .filter((p) => p.name)
+  // Get packet titles
+  const packets = Array.from(document.querySelectorAll('.paket')).map((paket) => {
     const paketTitle = paket.querySelector('.paketTitle').value.trim()
-
     return {
       title: paketTitle,
-      participants,
     }
   })
 
+  // Parse participants input
+  const participantsInput = document.getElementById('participantsInput').value.trim()
+  const { participants, errors: parseErrors } = parseParticipantsInput(participantsInput)
+
+  // Validate packet numbers
+  const packetValidationErrors = validatePacketNumbers(participants, packets.length)
+  const allErrors = [...parseErrors, ...packetValidationErrors]
+
+  // Convert to lottery format
+  const lotteryPackets = convertParticipantsToLotteryFormat(participants, packets)
+
   const data = {
     title,
-    packets: pakets,
+    packets: lotteryPackets,
   }
 
   // Only add timestamp if it's valid
@@ -293,12 +415,12 @@ function makeLotteryData() {
     data.timestamp = timestamp
   }
 
-  return data
+  return { data, errors: allErrors }
 }
 
 // Function to save lottery data to localStorage
 function saveLotteryData() {
-  const data = makeLotteryData()
+  const { data } = makeLotteryData()
   localStorage.setItem('lotteryData', JSON.stringify(data))
 }
 
@@ -568,27 +690,33 @@ function populateFormWithData(data) {
         const newPaket = createPaket()
         const paketTitleInput = newPaket.querySelector('.paketTitle')
         paketTitleInput.value = paket.title
-
-        // Remove default participant input
-        const participantsContainer = newPaket.querySelector('.participants-container')
-        participantsContainer.innerHTML = ''
-
-        // Add saved participants
-        paket.participants.forEach((participant) => {
-          const participantInput = createParticipantInput()
-          participantInput.querySelector('input').value = participant.name
-          participantsContainer.appendChild(participantInput)
-        })
-
-        // Add the "add participant" button
-        const addButton = document.createElement('button')
-        addButton.type = 'button'
-        addButton.className = 'add-participant'
-        addButton.textContent = '+ Neuer Teilnehmer'
-        participantsContainer.appendChild(addButton)
-
         paketsContainer.appendChild(newPaket)
       })
+
+      // Convert participants data to textarea format
+      const participantsInput = document.getElementById('participantsInput')
+      if (participantsInput && data.packets) {
+        const participantLines = []
+
+        // Create a map of participant names to their packet numbers
+        const participantMap = new Map()
+
+        data.packets.forEach((packet, packetIndex) => {
+          packet.participants.forEach(participant => {
+            if (!participantMap.has(participant.name)) {
+              participantMap.set(participant.name, [])
+            }
+            participantMap.get(participant.name).push(packetIndex + 1)
+          })
+        })
+
+        // Convert to textarea format
+        participantMap.forEach((packets, name) => {
+          participantLines.push(`${name} ${packets.join(' ')}`)
+        })
+
+        participantsInput.value = participantLines.join('\n')
+      }
 
       // Update UI state for normal lottery data
       console.log('populateFormWithData: Updating UI state')
@@ -606,15 +734,6 @@ function populateFormWithData(data) {
 
 // Update remove buttons visibility
 function updateRemoveButtons() {
-  // Update participant remove buttons
-  document.querySelectorAll('.participants-container').forEach((container) => {
-    const inputs = container.querySelectorAll('.participant-input')
-    inputs.forEach((input, index) => {
-      const removeButton = input.querySelector('.remove-participant')
-      removeButton.style.display = inputs.length > 1 ? 'flex' : 'none'
-    })
-  })
-
   // Update paket remove buttons
   const pakets = document.querySelectorAll('.paket')
   pakets.forEach((paket) => {
@@ -636,8 +755,14 @@ function updateDrawButton() {
 
   // Get all required inputs
   const form = document.getElementById('lotteryForm')
-  const inputs = form.querySelectorAll('input[required]')
+  const inputs = form.querySelectorAll('input[required], textarea[required]')
   let isValid = true
+
+  // Local function to set invalid and log reason
+  function setInvalid(reason) {
+    isValid = false
+    console.log('Setting invalid:', reason)
+  }
 
   // Debug: print values of all required inputs
   inputs.forEach((input) => {
@@ -648,16 +773,14 @@ function updateDrawButton() {
 
   // Validate all required inputs
   inputs.forEach((input) => {
-    const errorElement =
-      document.getElementById(`${input.id}Error`) ||
-      input.closest('.paket')?.querySelector('.paketTitle-error') ||
-      input.closest('.participants-container')?.querySelector('.participantName-error')
+    const errorElement = document.getElementById(`${input.id}Error`) ||
+      input.closest('.paket')?.querySelector('.paketTitle-error')
 
     // Pass false for showError to prevent showing errors during button state updates
     const valid = validateInput(input, errorElement, false)
     console.log(`Validating ${input.id || input.className}:`, valid)
     if (!valid) {
-      isValid = false
+      setInvalid(`Required input validation failed for ${input.id || input.className}`)
     }
   })
 
@@ -668,22 +791,7 @@ function updateDrawButton() {
     const valid = validateInput(input, errorElement, false)
     console.log(`Validating paket title:`, valid)
     if (!valid) {
-      isValid = false
-    }
-  })
-
-  // Validate all participant names that have a value
-  document.querySelectorAll('.participantName').forEach((input) => {
-    if (input.value.trim()) {
-      const errorElement = input
-        .closest('.participants-container')
-        .querySelector('.participantName-error')
-      // Pass false for showError to prevent showing errors during button state updates
-      const valid = validateInput(input, errorElement, false)
-      console.log(`Validating participant name:`, valid)
-      if (!valid) {
-        isValid = false
-      }
+      setInvalid(`Paket title validation failed`)
     }
   })
 
@@ -691,19 +799,41 @@ function updateDrawButton() {
   const pakets = document.querySelectorAll('.paket')
   console.log('Number of pakets:', pakets.length)
   if (pakets.length === 0) {
-    isValid = false
+    setInvalid('No pakets found')
   }
 
-  // Check if all pakets have at least one participant
-  const allPaketsHaveParticipants = Array.from(pakets).every((paket, idx) => {
-    const participants = paket.querySelectorAll('.participantName')
-    const hasParticipant = Array.from(participants).some((input) => input.value.trim())
-    console.log(`Paket #${idx + 1} has participant:`, hasParticipant)
-    return hasParticipant
+  // Validate participants input
+  const participantsInput = document.getElementById('participantsInput')
+  console.log('Validating participants input:', {
+    exists: !!participantsInput,
+    value: participantsInput?.value,
+    trimmed: participantsInput?.value?.trim()
   })
 
-  if (!allPaketsHaveParticipants) {
-    isValid = false
+  if (participantsInput && participantsInput.value.trim()) {
+    const { participants, errors: parseErrors } = parseParticipantsInput(participantsInput.value)
+    const pakets = document.querySelectorAll('.paket')
+    const packetValidationErrors = validatePacketNumbers(participants, pakets.length)
+    const allErrors = [...parseErrors, ...packetValidationErrors]
+
+    console.log('Participants validation:', {
+      participants: participants.length,
+      parseErrors: parseErrors.length,
+      packetValidationErrors: packetValidationErrors.length,
+      allErrors: allErrors.length
+    })
+
+    if (allErrors.length > 0) {
+      setInvalid('Participants validation failed due to errors')
+    }
+
+    // Check if we have at least one participant
+    if (participants.length === 0) {
+      setInvalid('No participants found')
+    }
+  } else {
+    // No participants entered
+    setInvalid('No participants input')
   }
 
   // Update button state
@@ -711,19 +841,54 @@ function updateDrawButton() {
   console.log('Draw button disabled:', drawButton.disabled, 'isValid:', isValid)
 }
 
-// Create a new participant input
-function createParticipantInput() {
-  const div = document.createElement('div')
-  div.className = 'participant-input'
-  div.innerHTML = `
-        <div class="input-wrapper">
-            <input type="text" placeholder="Teilnehmer Name" class="participantName" required minlength="2" maxlength="50" pattern="[a-zA-Z0-9_\\-]+">
-            <div class="validation-message participantName-error"></div>
-        </div>
-        <button type="button" class="remove-participant">×</button>
-    `
-  return div
+// Function to update participants overview
+function updateParticipantsOverview() {
+  const participantsInput = document.getElementById('participantsInput')
+  const overviewContainer = document.getElementById('participantsOverview')
+  const overviewContent = document.getElementById('overviewContent')
+
+  if (!participantsInput || !overviewContainer || !overviewContent) return
+
+  const input = participantsInput.value.trim()
+  if (!input) {
+    overviewContainer.style.display = 'none'
+    return
+  }
+
+  const { participants, errors: parseErrors } = parseParticipantsInput(input)
+  const pakets = Array.from(document.querySelectorAll('.paket')).map(paket => ({
+    title: paket.querySelector('.paketTitle').value.trim()
+  }))
+
+  const packetValidationErrors = validatePacketNumbers(participants, pakets.length)
+  const allErrors = [...parseErrors, ...packetValidationErrors]
+
+  const overviewHTML = generateParticipantsOverview(participants, pakets, allErrors)
+  overviewContent.innerHTML = overviewHTML
+
+  // Show overview if we have participants
+  if (participants.length > 0) {
+    overviewContainer.style.display = 'block'
+  } else {
+    overviewContainer.style.display = 'none'
+  }
+
+  // Update error display for participants input
+  const errorElement = document.getElementById('participantsInputError')
+  if (errorElement) {
+    if (allErrors.length > 0) {
+      errorElement.textContent = allErrors.join('\n')
+      errorElement.style.display = 'block'
+      errorElement.classList.add('show')
+    } else {
+      errorElement.style.display = 'none'
+      errorElement.classList.remove('show')
+      errorElement.textContent = ''
+    }
+  }
 }
+
+
 
 // Create a new paket
 function createPaket() {
@@ -738,10 +903,6 @@ function createPaket() {
                 <div class="validation-message paketTitle-error"></div>
             </div>
             <button type="button" class="remove-paket">×</button>
-        </div>
-        <div class="participants-container">
-            ${createParticipantInput().outerHTML}
-            <button type="button" class="add-participant">+ Neuer Teilnehmer</button>
         </div>
     `
   paketCounter++
@@ -770,11 +931,8 @@ const validationMessages = {
     minLength: 'Der Titel muss mindestens 3 Zeichen lang sein.',
     maxLength: 'Der Titel darf maximal 100 Zeichen lang sein.',
   },
-  participantName: {
-    required: 'Bitte gib den Nicknamen des Teilnehmers ein.',
-    minLength: 'Der Nickname muss mindestens 2 Zeichen lang sein.',
-    maxLength: 'Der Nickname darf maximal 50 Zeichen lang sein.',
-    pattern: 'Der Nickname darf nur Buchstaben, Zahlen, Unterstriche und Bindestriche enthalten.',
+  participantsInput: {
+    required: 'Bitte gib die Teilnehmer ein.',
   },
 }
 
@@ -809,7 +967,6 @@ function validateInput(input, errorElement, showError = true) {
   let validationKey = input.id
   if (!validationKey) {
     if (input.classList.contains('paketTitle')) validationKey = 'paketTitle'
-    else if (input.classList.contains('participantName')) validationKey = 'participantName'
   }
 
   // Check required
@@ -821,14 +978,28 @@ function validateInput(input, errorElement, showError = true) {
     })
     isValid = false
     errorMessage = validationMessages[validationKey]?.required || 'Dieses Feld ist erforderlich.'
+  } else if (input.required && value) {
+    console.log(`[validateInput] Required field validation passed for ${validationKey}:`, {
+      value,
+      required: input.required,
+      hasValue: !!value
+    })
   }
 
   // Check min/max length for text fields only
   if (isValid && value && (input.type === 'text' || input.type === 'textarea')) {
-    if (input.minLength && value.length < input.minLength) {
+    console.log(`[validateInput] Checking min/max length for ${validationKey}:`, {
+      value: value.length,
+      minLength: input.minLength,
+      maxLength: input.maxLength,
+      type: input.type
+    })
+    if (input.minLength && input.minLength > 0 && value.length < input.minLength) {
+      console.log(`[validateInput] Min length validation failed for ${validationKey}`)
       isValid = false
       errorMessage = validationMessages[validationKey]?.minLength
-    } else if (input.maxLength && value.length > input.maxLength) {
+    } else if (input.maxLength && input.maxLength > 0 && value.length > input.maxLength) {
+      console.log(`[validateInput] Max length validation failed for ${validationKey}`)
       isValid = false
       errorMessage = validationMessages[validationKey]?.maxLength
     }
@@ -836,8 +1007,13 @@ function validateInput(input, errorElement, showError = true) {
 
   // Check pattern for text fields only
   if (isValid && value && input.pattern && (input.type === 'text' || input.type === 'textarea')) {
+    console.log(`[validateInput] Checking pattern for ${validationKey}:`, {
+      pattern: input.pattern,
+      value: value
+    })
     const pattern = new RegExp(input.pattern)
     if (!pattern.test(value)) {
+      console.log(`[validateInput] Pattern validation failed for ${validationKey}`)
       isValid = false
       errorMessage = validationMessages[validationKey]?.pattern
     }
@@ -898,14 +1074,12 @@ function validateInput(input, errorElement, showError = true) {
 function validateForm() {
   console.log('Starting form validation')
   const form = document.getElementById('lotteryForm')
-  const inputs = form.querySelectorAll('input[required]')
+  const inputs = form.querySelectorAll('input[required], textarea[required]')
   let isValid = true
 
   inputs.forEach((input) => {
-    const errorElement =
-      document.getElementById(`${input.id}Error`) ||
-      input.closest('.paket')?.querySelector('.paketTitle-error') ||
-      input.closest('.participants-container')?.querySelector('.participantName-error')
+    const errorElement = document.getElementById(`${input.id}Error`) ||
+      input.closest('.paket')?.querySelector('.paketTitle-error')
 
     // Pass false for showError to prevent showing errors during form validation
     const inputValid = validateInput(input, errorElement, false)
@@ -926,20 +1100,18 @@ function validateForm() {
     }
   })
 
-  // Validate all participant names that have a value
-  document.querySelectorAll('.participantName').forEach((input) => {
-    if (input.value.trim()) {
-      const errorElement = input
-        .closest('.participants-container')
-        .querySelector('.participantName-error')
-      // Pass false for showError to prevent showing errors during form validation
-      const inputValid = validateInput(input, errorElement, false)
-      console.log(`Validating participant name:`, inputValid)
-      if (!inputValid) {
-        isValid = false
-      }
+  // Validate participants input
+  const participantsInput = document.getElementById('participantsInput')
+  if (participantsInput && participantsInput.value.trim()) {
+    const { participants, errors: parseErrors } = parseParticipantsInput(participantsInput.value)
+    const pakets = document.querySelectorAll('.paket')
+    const packetValidationErrors = validatePacketNumbers(participants, pakets.length)
+    const allErrors = [...parseErrors, ...packetValidationErrors]
+
+    if (allErrors.length > 0) {
+      isValid = false
     }
-  })
+  }
 
   console.log('Form validation complete:', isValid)
   return isValid
@@ -1079,45 +1251,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return `${day} ${month} ${year} ${hours}:${minutes}`
     }
 
-    // Add new participant input
-    function addNewParticipant(participantsContainer) {
-      // Remove the add button temporarily
-      const addButton = participantsContainer.querySelector('.add-participant')
-      addButton.remove()
 
-      // Add the new participant input
-      const newInput = createParticipantInput()
-      participantsContainer.appendChild(newInput)
-
-      // Add validation event listeners to the new input
-      const input = newInput.querySelector('input')
-      const errorElement = newInput.querySelector('.participantName-error')
-
-      // Only validate on blur
-      input.addEventListener('blur', () => {
-        validateInput(input, errorElement, true)
-        updateDrawButton()
-      })
-
-      newInput.querySelector('input').focus()
-
-      // Add the button back at the bottom
-      participantsContainer.appendChild(addButton)
-
-      updateRemoveButtons()
-      updateDrawButton()
-    }
-
-    // Remove participant input
-    function removeParticipant(event) {
-      const participantInput = event.target.closest('.participant-input')
-      const participantsContainer = participantInput.closest('.participants-container')
-      if (participantsContainer.children.length > 1) {
-        participantInput.remove()
-        updateRemoveButtons()
-        updateDrawButton()
-      }
-    }
 
     // Remove paket
     function removePaket(event) {
@@ -1127,6 +1261,7 @@ document.addEventListener('DOMContentLoaded', () => {
         paket.remove()
         renumberPakets()
         updateRemoveButtons()
+        updateParticipantsOverview()
         updateDrawButton()
       }
     }
@@ -1157,29 +1292,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Add timestamp event listener
     document.getElementById('timestamp').addEventListener('change', updateDrawButton)
 
-    // Handle participant input events
+    // Handle paket input events
     paketsContainer.addEventListener('input', (event) => {
-      if (
-        event.target.classList.contains('participantName') ||
-        event.target.classList.contains('paketTitle')
-      ) {
+      if (event.target.classList.contains('paketTitle')) {
+        updateParticipantsOverview()
         updateDrawButton()
-      }
-    })
-
-    // Add new participant input when Enter is pressed
-    function handleParticipantInput(event) {
-      if (event.key === 'Enter' && event.target.value.trim()) {
-        event.preventDefault()
-        const participantsContainer = event.target.closest('.participants-container')
-        addNewParticipant(participantsContainer)
-      }
-    }
-
-    // Handle participant input events
-    paketsContainer.addEventListener('keydown', (event) => {
-      if (event.target.classList.contains('participantName')) {
-        handleParticipantInput(event)
       }
     })
 
@@ -1187,11 +1304,6 @@ document.addEventListener('DOMContentLoaded', () => {
     paketsContainer.addEventListener('click', (event) => {
       if (event.target.classList.contains('remove-paket')) {
         removePaket(event)
-      } else if (event.target.classList.contains('remove-participant')) {
-        removeParticipant(event)
-      } else if (event.target.classList.contains('add-participant')) {
-        const participantsContainer = event.target.closest('.participants-container')
-        addNewParticipant(participantsContainer)
       }
     })
 
@@ -1203,6 +1315,7 @@ document.addEventListener('DOMContentLoaded', () => {
       paketsContainer.appendChild(newPaket)
       newPaket.querySelector('input').focus()
       updateRemoveButtons()
+      updateParticipantsOverview()
       updateDrawButton()
     })
 
@@ -1224,6 +1337,17 @@ document.addEventListener('DOMContentLoaded', () => {
       })
     })
 
+    // Add event listeners for participants input
+    const participantsInput = document.getElementById('participantsInput')
+    if (participantsInput) {
+      saveEvents.forEach((eventType) => {
+        participantsInput.addEventListener(eventType, () => {
+          updateParticipantsOverview()
+          updateDrawButton()
+        })
+      })
+    }
+
     // Modify draw button click handler to use makeLotteryData
     drawButton.addEventListener('click', async () => {
       console.log('Draw button clicked')
@@ -1235,13 +1359,19 @@ document.addEventListener('DOMContentLoaded', () => {
       console.log('Form validation passed')
 
       try {
-        const lotteryData = makeLotteryData()
+        const { data: lotteryData, errors } = makeLotteryData()
         console.log('Lottery data:', lotteryData)
+        console.log('Validation errors:', errors)
+
+        if (errors && errors.length > 0) {
+          console.log('Validation errors found')
+          throw new Error(`Validierungsfehler:\n${errors.join('\n')}`)
+        }
 
         // Validate data before proceeding
         if (!lotteryData.packets.every((p) => p.title)) {
           console.log('Packet title validation failed')
-          throw new Error('Bitte geben Sie für jedes Paket einen Titel ein.')
+          throw new Error('Bitte gib für jedes Paket einen Titel ein.')
         }
         console.log('Packet title validation passed')
 
@@ -1281,8 +1411,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     updateDrawButton()
 
-    // Add validation event listeners for all inputs
-    const inputs = form.querySelectorAll('input')
+    // Add validation event listeners for all inputs and textareas
+    const inputs = form.querySelectorAll('input, textarea')
 
     inputs.forEach((input) => {
       console.log(`[DOMContentLoaded] Setting up validation for input:`, {
@@ -1294,22 +1424,18 @@ document.addEventListener('DOMContentLoaded', () => {
       // Create error element if it doesn't exist
       let errorElement =
         document.getElementById(`${input.id}Error`) ||
-        input.closest('.paket')?.querySelector('.paketTitle-error') ||
-        input.closest('.participants-container')?.querySelector('.participantName-error')
+        input.closest('.paket')?.querySelector('.paketTitle-error')
 
       if (!errorElement) {
         const formGroup =
           input.closest('.form-group') ||
-          input.closest('.paket') ||
-          input.closest('.participants-container')
+          input.closest('.paket')
         if (formGroup) {
           errorElement = document.createElement('div')
           if (input.id) {
             errorElement.id = `${input.id}Error`
           } else if (input.classList.contains('paketTitle')) {
             errorElement.className = 'paketTitle-error'
-          } else if (input.classList.contains('participantName')) {
-            errorElement.className = 'participantName-error'
           }
           formGroup.appendChild(errorElement)
         }
@@ -1394,7 +1520,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Function to download lottery data
 function downloadLotteryData() {
-  const data = makeLotteryData()
+  const { data } = makeLotteryData()
   const filename = createFilename(data.title)
   const jsonStr = JSON.stringify(data, null, 4)
   const blob = new Blob([jsonStr], { type: 'application/json' })
