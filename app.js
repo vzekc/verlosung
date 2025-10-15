@@ -28,8 +28,8 @@ function parseParticipantsInput(input) {
     const packetNumbers = parts.slice(1).map(part => part.trim()).filter(part => part)
 
     // Validate nickname
-    if (!nickname.match(/^[a-zA-Z0-9_-]+$/)) {
-      errors.push(`Zeile ${lineIndex + 1}: Ungültiger Nickname "${nickname}". Nur Buchstaben, Zahlen, Unterstriche und Bindestriche erlaubt.`)
+    if (!nickname.match(/^[a-zA-Z0-9_.-]+$/)) {
+      errors.push(`Zeile ${lineIndex + 1}: Ungültiger Nickname "${nickname}". Nur Buchstaben, Zahlen, Unterstriche, Punkte und Bindestriche erlaubt.`)
       return
     }
 
