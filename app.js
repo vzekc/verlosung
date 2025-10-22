@@ -164,7 +164,7 @@ function getResultsHTML(results) {
                         <ul class="participants-list">
                             ${drawing.participants.map((p) => `<li class="participant">@${p.name}</li>`).join('')}
                         </ul>
-                        <div class="winner-announcement"><strong>Gewinner:</strong> @${drawing.winner} ${getRandomWinEmoji()}</div>
+                        <div class="winner-announcement"><strong>Gewinner:</strong> @${drawing.winner || 'Wurde nicht velost'} ${drawing.winner ? getRandomWinEmoji() : '😢'}</div>
                     </section>
                 `,
                   )
