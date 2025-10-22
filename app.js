@@ -189,15 +189,21 @@ function getResultsHTML(results) {
                 ${results.drawings
                   .map(
                     (drawing, index) => {
-                      const winner = drawing.winner ? `<strong>Gewinner:</strong> @${drawing.winner} ${getRandomWinEmoji()}` : '<strong>Wollte niemand haben</strong> 😢'
-                      return `<section class="result-item">
-                                <h3>Paket #${index + 1}: ${drawing.text}</h3>
-                                <div class="participants-label"><strong>Teilnehmer:</strong></div>
-                                <ul class="participants-list">
-                                  ${drawing.participants.map((p) => `<li class="participant">@${p.name}</li>`).join('')}
-                                </ul>
-                                <div class="winner-announcement">${winner}</div>
-                              </section>`
+                      if (drawing.winner) {
+                        return `<section class="result-item">
+                                  <h3>Paket #${index + 1}: ${drawing.text}</h3>
+                                  <div class="participants-label"><strong>Teilnehmer:</strong></div>
+                                  <ul class="participants-list">
+                                    ${drawing.participants.map((p) => `<li class="participant">@${p.name}</li>`).join('')}
+                                  </ul>
+                                  <div class="winner-announcement"><strong>Gewinner:</strong> @${drawing.winner} ${getRandomWinEmoji()}</div>
+                                </section>`
+                      } else {
+                        return `<section class="result-item">
+                                  <h3>Paket #${index + 1}: ${drawing.text}</h3>
+                                  <div class="winner-announcement"><strong>Wollte niemand haben</strong> 😢</div>
+                                </section>`
+                      }
                     },
                   )
                   .join('')}
