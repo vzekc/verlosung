@@ -16,20 +16,51 @@ function parseParticipantsInput(input) {
     const trimmedLine = line.trim()
     if (!trimmedLine) return
 
-    // Split by spaces, commas, or semicolons
-    const parts = trimmedLine.split(/[\s,;]+/).filter(part => part.trim())
+    let nickname = ''
+    let packetNumbersText = ''
 
-    if (parts.length < 2) {
-      errors.push(`Zeile ${lineIndex + 1}: Ungültiges Format. Erwartet: <nickname> <paket1> [<paket2> ...]`)
+    // Check if nickname is quoted
+    if (trimmedLine.startsWith('"') || trimmedLine.startsWith("'")) {
+      const quoteChar = trimmedLine[0]
+      const closingQuoteIndex = trimmedLine.indexOf(quoteChar, 1)
+
+      if (closingQuoteIndex === -1) {
+        errors.push(`Zeile ${lineIndex + 1}: Fehlendes schließendes Anführungszeichen.`)
+        return
+      }
+
+      nickname = trimmedLine.substring(1, closingQuoteIndex).trim()
+      packetNumbersText = trimmedLine.substring(closingQuoteIndex + 1).trim()
+    } else {
+      // Split by spaces, commas, or semicolons for unquoted nicknames
+      const parts = trimmedLine.split(/[\s,;]+/).filter(part => part.trim())
+
+      if (parts.length < 2) {
+        errors.push(`Zeile ${lineIndex + 1}: Ungültiges Format. Erwartet: <nickname> <paket1> [<paket2> ...] oder "<nickname mit leerzeichen>" <paket1> [<paket2> ...]`)
+        return
+      }
+
+      nickname = parts[0].trim()
+      packetNumbersText = parts.slice(1).join(' ')
+    }
+
+    // Parse packet numbers from the remaining text
+    const packetNumbers = packetNumbersText.split(/[\s,;]+/).map(part => part.trim()).filter(part => part)
+
+    if (packetNumbers.length === 0) {
+      errors.push(`Zeile ${lineIndex + 1}: Keine Paketnummern angegeben.`)
       return
     }
 
-    const nickname = parts[0].trim()
-    const packetNumbers = parts.slice(1).map(part => part.trim()).filter(part => part)
+    // Validate nickname - allow letters, numbers, underscores, periods, hyphens, and spaces
+    if (!nickname.match(/^[a-zA-Z0-9_.\s-]+$/)) {
+      errors.push(`Zeile ${lineIndex + 1}: Ungültiger Nickname "${nickname}". Nur Buchstaben, Zahlen, Unterstriche, Punkte, Leerzeichen und Bindestriche erlaubt.`)
+      return
+    }
 
-    // Validate nickname
-    if (!nickname.match(/^[a-zA-Z0-9_.-]+$/)) {
-      errors.push(`Zeile ${lineIndex + 1}: Ungültiger Nickname "${nickname}". Nur Buchstaben, Zahlen, Unterstriche, Punkte und Bindestriche erlaubt.`)
+    // Additional check: nickname should not be empty after trimming
+    if (!nickname) {
+      errors.push(`Zeile ${lineIndex + 1}: Nickname darf nicht leer sein.`)
       return
     }
 
@@ -661,7 +692,9 @@ function populateFormWithData(data) {
 
         // Convert to textarea format
         participantMap.forEach((packets, name) => {
-          participantLines.push(`${name} ${packets.join(' ')}`)
+          // Quote the name if it contains spaces
+          const formattedName = name.includes(' ') ? `"${name}"` : name
+          participantLines.push(`${formattedName} ${packets.join(' ')}`)
         })
 
         participantsInput.value = participantLines.join('\n')
