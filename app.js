@@ -487,9 +487,6 @@ function initializeApp(data) {
               }
             })
           }
-          if (!drawing.winner) {
-            validationErrors.push(`Ziehung #${index + 1}: Kein Gewinner gefunden`)
-          }
         })
       }
     }
